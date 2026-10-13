@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#E3E6EA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171C22" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Maker Space">
+<title>Maker Space Lights</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💡</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+    --wall: #E3E6EA; --plate: #F8F9FA; --plate-edge: #CFD5DC; --rocker-hi: #FFFFFF; --rocker-lo: #E4E8EC;
+    --ink: #1E2731; --muted: #66727F; --amber: #FFB238; --glow: rgba(255, 178, 56, 0.30);
+    --led-off: #BAC2CB; --err: #B4471B; --ok: #2F8F5B;
+    --font: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --wall: #171C22; --plate: #262D36; --plate-edge: #343D49; --rocker-hi: #303844; --rocker-lo: #222831;
+        --ink: #E8ECF0; --muted: #97A3B0; --glow: rgba(255, 178, 56, 0.16); --led-off: #46505C; --err: #F08A5D; --ok: #5CC48A;
+    }
+}
+:root[data-theme="dark"] {
+    --wall: #171C22; --plate: #262D36; --plate-edge: #343D49; --rocker-hi: #303844; --rocker-lo: #222831;
+    --ink: #E8ECF0; --muted: #97A3B0; --glow: rgba(255, 178, 56, 0.16); --led-off: #46505C; --err: #F08A5D; --ok: #5CC48A;
+}
+* { box-sizing: border-box; }
+:root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--wall);
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+html, body { margin: 0; }
+body {
+    font-family: var(--font); color: var(--ink); background: var(--wall);
+    -webkit-tap-highlight-color: transparent; padding: 0 16px; min-height: 100%;
+    position: relative; overflow-x: hidden;
+}
+body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(circle at 50% 30%, var(--glow), transparent 60%);
+    opacity: 0; transition: opacity 600ms ease;
+}
+body[data-state="ON"]::before { opacity: 1; }
+
+header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 0 12px; position: relative; max-width: 560px; margin: 0 auto;
+}
+.brand h1 { font-size: 19px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.brand p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+.conn { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--muted); }
+.conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--led-off); }
+.conn[data-ok="true"] .conn-dot { background: var(--ok); }
+.conn[data-ok="false"] .conn-dot { background: var(--err); }
+
+main {
+    display: flex; flex-direction: column; align-items: center; gap: 22px;
+    position: relative; padding: 4px 0 24px; max-width: 560px; margin: 0 auto;
+}
+
+/* ---------- Room view ---------- */
+.room-card {
+    width: 100%; border-radius: 18px; overflow: hidden; background: #0c0d0f;
+    border: 1px solid var(--plate-edge); box-shadow: 0 18px 40px -22px rgba(10, 15, 25, 0.6);
+}
+.room-card svg { display: block; width: 100%; height: auto; }
+.room-hint { margin: -10px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
+
+.ring-lit, .ring-glow, .cone, .wash, .pool { opacity: 0; transition: opacity 500ms ease; }
+.room[data-left="ON"] .ring-lit { opacity: 1; }
+.room[data-left="ON"] .ring-glow { opacity: 0.75; }
+.room[data-left="ON"] .pool { opacity: 1; }
+.room[data-right="ON"] .cone { opacity: 0.55; }
+.room[data-right="ON"] .wash { opacity: 0.8; }
+.lens { fill: #3a3d42; transition: fill 400ms ease; }
+.room[data-right="ON"] .lens { fill: #ffe2b0; }
+.ov { fill: #04050a; transition: opacity 500ms ease; }
+#ovCeil { opacity: 0.66; }
+.room[data-left="ON"] #ovCeil { opacity: 0; }
+.room[data-left="OFF"][data-right="ON"] #ovCeil { opacity: 0.45; }
+#ovWall { opacity: 0.7; }
+.room[data-right="ON"] #ovWall { opacity: 0; }
+.room[data-left="ON"][data-right="OFF"] #ovWall { opacity: 0.3; }
+.hit { cursor: pointer; outline: none; }
+.hit path { fill: transparent; stroke: transparent; stroke-width: 2; pointer-events: all; transition: fill 150ms ease; }
+.hit:hover path { fill: rgba(255, 255, 255, 0.04); }
+.hit:focus-visible path { stroke: var(--amber); fill: rgba(255, 178, 56, 0.08); }
+.tag rect { fill: rgba(0, 0, 0, 0.6); }
+.tag text { fill: #fff; font: 600 9.5px var(--font); }
+.tag .dot { fill: #6b7380; transition: fill 300ms ease; }
+.room[data-left="ON"] #tagLeft .dot, .room[data-right="ON"] #tagRight .dot { fill: var(--amber); }
+
+/* ---------- Switch plates ---------- */
+.switches { display: flex; justify-content: center; gap: 18px; width: 100%; }
+.unit { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.unit-name { font-size: 14px; font-weight: 500; color: var(--muted); text-align: center; }
+.unit-state { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+.unit-changed { margin: 0; font-size: 12.5px; color: var(--muted); text-align: center; min-height: 17px; }
+.plate {
+    width: 100%; max-width: 112px; aspect-ratio: 2 / 3; background: var(--plate);
+    border: 1px solid var(--plate-edge); border-radius: 18px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 14px 30px -16px rgba(20,30,40,0.35);
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: 11px 0; cursor: pointer; font: inherit; color: inherit;
+}
+.plate:focus-visible { outline: 3px solid var(--amber); outline-offset: 5px; }
+.plate:disabled { cursor: progress; }
+.screw { width: 9px; height: 9px; border-radius: 50%; background: var(--rocker-lo); border: 1px solid var(--plate-edge); position: relative; }
+.screw::after { content: ""; position: absolute; left: 2px; right: 2px; top: 3px; height: 1px; background: var(--plate-edge); transform: rotate(-30deg); }
+.rocker-well { width: 52%; height: 66%; border-radius: 10px; background: var(--plate-edge); padding: 3px; perspective: 400px; }
+.rocker {
+    width: 100%; height: 100%; border-radius: 8px;
+    background: linear-gradient(180deg, var(--rocker-lo), var(--rocker-hi) 50%, var(--rocker-hi));
+    transform: rotateX(10deg); transition: transform 220ms cubic-bezier(.3,.7,.3,1.2), background 220ms ease;
+    display: flex; align-items: flex-start; justify-content: center; padding-top: 14%;
+}
+.unit[data-state="ON"] .rocker { background: linear-gradient(180deg, var(--rocker-hi), var(--rocker-hi) 50%, var(--rocker-lo)); transform: rotateX(-10deg); }
+.led { width: 8px; height: 8px; border-radius: 50%; background: var(--led-off); transition: background 300ms ease, box-shadow 300ms ease; }
+.unit[data-state="ON"] .led { background: var(--amber); box-shadow: 0 0 9px 3px var(--glow), 0 0 2px var(--amber); }
+
+.status { text-align: center; min-height: 20px; max-width: 340px; width: 100%; }
+.msg { font-size: 15px; color: var(--err); }
+.msg:empty { display: none; }
+.msg button, .ghost {
+    font: inherit; font-size: 14px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--plate-edge);
+    background: var(--plate); color: var(--ink); cursor: pointer;
+}
+.msg button { margin-top: 10px; }
+
+/* ---------- Cards ---------- */
+.card { width: 100%; border: 1px solid var(--plate-edge); border-radius: 16px; background: var(--plate); padding: 16px 18px 18px; }
+.timer-head { display: flex; align-items: center; justify-content: space-between; }
+.timer-head h2 { font-size: 17px; font-weight: 600; margin: 0; }
+.timer-next { margin: 6px 0 14px; font-size: 15px; color: var(--muted); }
+.timer-next strong { color: var(--ink); font-weight: 600; }
+
+.toggle { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+.toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.toggle .track { width: 46px; height: 28px; border-radius: 14px; background: var(--plate-edge); position: relative; transition: background 200ms ease; }
+.toggle .thumb { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: transform 200ms ease; }
+.toggle input:checked + .track { background: var(--amber); }
+.toggle input:checked + .track .thumb { transform: translateX(18px); }
+.toggle input:focus-visible + .track { outline: 3px solid var(--amber); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.days { display: flex; gap: 6px; margin-bottom: 14px; }
+.day {
+    flex: 1 1 0; height: 36px; border-radius: 10px; border: 1px solid var(--plate-edge);
+    background: transparent; color: var(--muted); font: 600 14px var(--font); cursor: pointer;
+}
+.day[aria-pressed="true"] { background: var(--ink); color: var(--wall); border-color: var(--ink); }
+.day:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+.events { display: flex; flex-direction: column; gap: 8px; }
+.event { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 0.8fr) minmax(0, 1fr) 36px; gap: 6px; align-items: center; }
+.event input, .event select {
+    font: 500 14px var(--font); color: var(--ink); background: var(--wall);
+    border: 1px solid var(--plate-edge); border-radius: 10px; height: 40px; padding: 0 6px; width: 100%; min-width: 0;
+}
+.event input:focus-visible, .event select:focus-visible { outline: 3px solid var(--amber); outline-offset: 1px; }
+.del {
+    width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--plate-edge); background: transparent;
+    color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer;
+}
+.del:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+.timer-actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; }
+.timer-note { margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+.timer-note[data-kind="err"] { color: var(--err); }
+
+/* ---------- Angle settings ---------- */
+.angles { width: 100%; border: 1px solid var(--plate-edge); border-radius: 16px; background: var(--plate); }
+.angles summary { list-style: none; cursor: pointer; padding: 14px 18px; font-weight: 500; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+.angles summary::-webkit-details-marker { display: none; }
+.angles summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform 200ms ease; margin-right: 4px; }
+.angles[open] summary::after { transform: rotate(-135deg); }
+.angles summary:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; border-radius: 16px; }
+.angles-body { padding: 0 18px 18px; }
+.angles-group + .angles-group { border-top: 1px solid var(--plate-edge); margin-top: 4px; }
+.angles-group h3 { font-size: 14px; font-weight: 600; color: var(--muted); margin: 14px 0 12px; }
+.field { margin-bottom: 16px; }
+.field-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; margin-bottom: 8px; }
+.field-top output { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 17px; }
+input[type="range"] { width: 100%; accent-color: var(--amber); height: 28px; margin: 0; }
+.swap { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); margin: 2px 0 14px; cursor: pointer; }
+.swap input { width: 18px; height: 18px; accent-color: var(--amber); }
+.angles-actions { display: flex; align-items: center; gap: 12px; }
+.save {
+    font: inherit; font-weight: 600; font-size: 15px; padding: 11px 20px; border-radius: 12px; border: none;
+    background: var(--ink); color: var(--wall); cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.save:disabled { opacity: 0.45; cursor: default; }
+.save:focus-visible, .ghost:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+.angles-note { font-size: 14px; color: var(--muted); }
+.angles-note[data-kind="err"] { color: var(--err); }
+
+footer { text-align: center; font-size: 13px; color: var(--muted); padding: 0 0 22px; position: relative; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; } }
+
+</style>
+</head>
+<body data-state="unknown">
+
+<header>
+    <div class="brand">
+        <h1>Maker Space</h1>
+        <p>Smart lights</p>
+    </div>
+    <div class="conn" id="conn"><span class="conn-dot"></span><span id="connText">Connecting</span></div>
+</header>
+
+<main>
+    <div class="room-card">
+<svg class="room" id="room" data-left="unknown" data-right="unknown" viewBox="0 0 400 240" role="group" aria-labelledby="roomTitle">
+    <title id="roomTitle">Maker Space, simple view</title>
+    <defs>
+        <linearGradient id="floorG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b2d31"/><stop offset="1" stop-color="#3f4247"/></linearGradient>
+        <linearGradient id="washG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd59a" stop-opacity=".85"/><stop offset=".8" stop-color="#ffcf8f" stop-opacity=".25"/><stop offset="1" stop-color="#ffcf8f" stop-opacity="0"/></linearGradient>
+        <radialGradient id="coneG" cx=".5" cy="0" r="1"><stop offset="0" stop-color="#fff3dc" stop-opacity=".95"/><stop offset="1" stop-color="#ffd39a" stop-opacity="0"/></radialGradient>
+        <radialGradient id="poolG" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#eef3ff" stop-opacity=".18"/><stop offset="1" stop-color="#eef3ff" stop-opacity="0"/></radialGradient>
+        <filter id="blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3.5"/></filter>
+    </defs>
+
+    <!-- ceiling, wall, floor -->
+    <rect x="0" y="0" width="400" height="100" fill="#16181b"/>
+    <rect x="0" y="100" width="400" height="100" fill="#e9dcc3"/>
+    <rect x="0" y="169" width="400" height="3" fill="#f6f5f1"/>
+    <rect x="0" y="200" width="400" height="40" fill="url(#floorG)"/>
+
+    <!-- hanging wires + unlit square rings -->
+    <path d="M36 44V0M120 44V0M158 44V0M242 44V0M280 44V0M364 44V0" stroke="#2a2c30" stroke-width=".8"/>
+    <g fill="none" stroke="#30333a">
+        <rect x="36" y="44" width="84" height="30" stroke-width="5"/>
+        <rect x="158" y="44" width="84" height="30" stroke-width="5"/>
+        <rect x="280" y="44" width="84" height="30" stroke-width="5"/>
+    </g>
+
+    <!-- spotlight track along the whole wall -->
+    <path d="M0 104H400" stroke="#08090a" stroke-width="2.5"/>
+    <g id="spots" fill="#0a0a0b">
+        <rect x="22" y="105" width="6" height="7" rx="1.5"/><rect x="72" y="105" width="6" height="7" rx="1.5"/>
+        <rect x="122" y="105" width="6" height="7" rx="1.5"/><rect x="172" y="105" width="6" height="7" rx="1.5"/>
+        <rect x="222" y="105" width="6" height="7" rx="1.5"/><rect x="272" y="105" width="6" height="7" rx="1.5"/>
+        <rect x="322" y="105" width="6" height="7" rx="1.5"/><rect x="372" y="105" width="6" height="7" rx="1.5"/>
+    </g>
+    <g>
+        <circle class="lens" cx="25" cy="113.5" r="2.2"/><circle class="lens" cx="75" cy="113.5" r="2.2"/>
+        <circle class="lens" cx="125" cy="113.5" r="2.2"/><circle class="lens" cx="175" cy="113.5" r="2.2"/>
+        <circle class="lens" cx="225" cy="113.5" r="2.2"/><circle class="lens" cx="275" cy="113.5" r="2.2"/>
+        <circle class="lens" cx="325" cy="113.5" r="2.2"/><circle class="lens" cx="375" cy="113.5" r="2.2"/>
+    </g>
+
+    <!-- darkness: ceiling+floor follow the squares, wall follows the spotlights -->
+    <path id="ovCeil" class="ov" fill-rule="evenodd" d="M0 0H400V240H0Z M0 100H400V200H0Z"/>
+    <rect id="ovWall" class="ov" x="0" y="100" width="400" height="100"/>
+
+    <!-- spotlights lit -->
+    <rect class="wash" x="0" y="100" width="400" height="100" fill="url(#washG)"/>
+    <g class="cone" fill="url(#coneG)">
+        <path d="M22.5 116H27.5L47 172H3Z"/><path d="M72.5 116H77.5L97 172H53Z"/>
+        <path d="M122.5 116H127.5L147 172H103Z"/><path d="M172.5 116H177.5L197 172H153Z"/>
+        <path d="M222.5 116H227.5L247 172H203Z"/><path d="M272.5 116H277.5L297 172H253Z"/>
+        <path d="M322.5 116H327.5L347 172H303Z"/><path d="M372.5 116H377.5L397 172H353Z"/>
+    </g>
+
+    <!-- squares lit -->
+    <ellipse class="pool" cx="200" cy="222" rx="200" ry="24" fill="url(#poolG)"/>
+    <g class="ring-glow" fill="none" stroke="#e8f0ff" stroke-width="13" filter="url(#blur)">
+        <rect x="36" y="44" width="84" height="30"/><rect x="158" y="44" width="84" height="30"/><rect x="280" y="44" width="84" height="30"/>
+    </g>
+    <g class="ring-lit" fill="none" stroke="#fffef9" stroke-width="3.6">
+        <rect x="36" y="44" width="84" height="30"/><rect x="158" y="44" width="84" height="30"/><rect x="280" y="44" width="84" height="30"/>
+    </g>
+
+    <!-- labels -->
+    <g class="tag" transform="translate(10 10)" aria-hidden="true" id="tagLeft">
+        <rect width="124" height="20" rx="10"/><circle class="dot" cx="11" cy="10" r="3.5"/>
+        <text x="20" y="13.5" id="tagLeftText">Square lights</text>
+    </g>
+    <g class="tag" transform="translate(10 177)" aria-hidden="true" id="tagRight">
+        <rect width="132" height="20" rx="10"/><circle class="dot" cx="11" cy="10" r="3.5"/>
+        <text x="20" y="13.5" id="tagRightText">Wall spotlights</text>
+    </g>
+
+    <!-- tap areas -->
+    <g class="hit" id="hitLeft" role="button" tabindex="0" aria-label="Square lights">
+        <path d="M0 0H400V100H0Z M0 200H400V240H0Z"/>
+    </g>
+    <g class="hit" id="hitRight" role="button" tabindex="0" aria-label="Wall spotlights">
+        <path d="M0 100H400V200H0Z"/>
+    </g>
+</svg>
+
+    </div>
+    <p class="room-hint">Tap the ceiling or the wall to switch the lights.</p>
+
+    <div class="switches">
+        <div class="unit" id="unit1" data-state="unknown">
+            <div class="unit-name">Square lights</div>
+            <button class="plate" id="plate1" aria-pressed="false" aria-label="Square lights" disabled>
+                <span class="screw" aria-hidden="true"></span>
+                <span class="rocker-well" aria-hidden="true"><span class="rocker"><span class="led"></span></span></span>
+                <span class="screw" aria-hidden="true"></span>
+            </button>
+            <h2 class="unit-state" id="state1">Checking</h2>
+            <p class="unit-changed" id="changed1">&nbsp;</p>
+        </div>
+        <div class="unit" id="unit2" data-state="unknown">
+            <div class="unit-name">Wall spotlights</div>
+            <button class="plate" id="plate2" aria-pressed="false" aria-label="Wall spotlights" disabled>
+                <span class="screw" aria-hidden="true"></span>
+                <span class="rocker-well" aria-hidden="true"><span class="rocker"><span class="led"></span></span></span>
+                <span class="screw" aria-hidden="true"></span>
+            </button>
+            <h2 class="unit-state" id="state2">Checking</h2>
+            <p class="unit-changed" id="changed2">&nbsp;</p>
+        </div>
+    </div>
+
+    <div class="status" aria-live="polite"><div class="msg" id="msg"></div></div>
+
+    <section class="card timer" aria-labelledby="timerTitle">
+        <div class="timer-head">
+            <h2 id="timerTitle">Timer</h2>
+            <label class="toggle"><input type="checkbox" id="timerOn"><span class="track"><span class="thumb"></span></span><span class="sr">Timer on</span></label>
+        </div>
+        <p class="timer-next" id="timerNext" aria-live="polite">Loading…</p>
+        <div class="days" id="days" role="group" aria-label="Days the timer runs"></div>
+        <div class="events" id="events"></div>
+        <div class="timer-actions">
+            <button type="button" class="ghost" id="addEvent">Add time</button>
+            <button type="button" class="save" id="saveTimer" disabled>Save timer</button>
+        </div>
+        <p class="timer-note" id="timerNote">Singapore time. Runs on the server, even when this app is closed.</p>
+    </section>
+
+    <details class="angles" id="angles">
+        <summary>Switch angles</summary>
+        <div class="angles-body">
+            <div class="angles-group">
+                <h3>Square lights</h3>
+                <label class="swap"><input type="checkbox" id="swap1"> Reverse On/Off (if the app shows the opposite of the real light)</label>
+                <div class="field">
+                    <div class="field-top"><label for="on1">On position</label><output id="onOut1" for="on1">90°</output></div>
+                    <input type="range" id="on1" min="0" max="180" step="1" value="90">
+                </div>
+                <div class="field">
+                    <div class="field-top"><label for="off1">Off position</label><output id="offOut1" for="off1">90°</output></div>
+                    <input type="range" id="off1" min="0" max="180" step="1" value="90">
+                </div>
+            </div>
+            <div class="angles-group">
+                <h3>Wall spotlights</h3>
+                <label class="swap"><input type="checkbox" id="swap2"> Reverse On/Off (if the app shows the opposite of the real light)</label>
+                <div class="field">
+                    <div class="field-top"><label for="on2">On position</label><output id="onOut2" for="on2">90°</output></div>
+                    <input type="range" id="on2" min="0" max="180" step="1" value="90">
+                </div>
+                <div class="field">
+                    <div class="field-top"><label for="off2">Off position</label><output id="offOut2" for="off2">90°</output></div>
+                    <input type="range" id="off2" min="0" max="180" step="1" value="90">
+                </div>
+            </div>
+            <div class="angles-actions">
+                <button type="button" class="save" id="saveAngles" disabled>Save angles</button>
+                <span class="angles-note" id="anglesNote">On and Off match what this app shows.</span>
+            </div>
+        </div>
+    </details>
+</main>
+
+<footer>Lights follow within a few seconds.</footer>
+
+<script>
+// ---- Settings ----
+const SUPABASE_URL = "https://ogxuwchojexznsxvvdhi.supabase.co";
+const SUPABASE_KEY = "sb_publishable_pB5HMEXMjVDQiNcWlenV1A_ETc2qaNP";
+const REFRESH_MS = 3000;
+
+async function getJson(path) {
+    const res = await fetch(SUPABASE_URL + path, { headers: { apikey: SUPABASE_KEY }, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+}
+async function fetchAll() {
+    const [rows, sched] = await Promise.all([
+        getJson("/rest/v1/smartlight?id=eq.1&select=state,state2,updated_at,updated_at2,on_angle,off_angle,on_angle2,off_angle2,invert1,invert2,timer_enabled,timer_days"),
+        getJson("/rest/v1/smartlight_schedule?select=at_time,action,target&order=at_time")
+    ]);
+    return { row: rows[0], events: sched.map(e => ({ t: String(e.at_time).slice(0, 5), a: e.action, g: e.target })) };
+}
+async function rpc(name, args) {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify(args)
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+}
+const setLightRemote = (ch, state) => rpc("set_light_ch", { pin: PIN, ch, new_state: state });
+const saveAnglesRemote = (ch, on, off) => rpc("set_angles_ch", { pin: PIN, ch, new_on: Math.round(on), new_off: Math.round(off) });
+const setInvertRemote = (ch, inv) => rpc("set_invert", { pin: PIN, ch, inv });
+const saveTimerRemote = (enabled, days, events) => rpc("save_timer", { pin: PIN, enabled, days, events });
+
+const PIN = "HDF85FGYI0";
+const TZ = "Asia/Singapore";
+// ------------------
+
+const el = id => document.getElementById(id);
+const CH = [1, 2];
+const NAME = { 1: "Square lights", 2: "Wall spotlights" };
+const TARGET = { both: "Both lights", left: "Square lights", right: "Wall spotlights" };
+const DAYS = [
+    { n: 1, s: "M", l: "Monday" }, { n: 2, s: "T", l: "Tuesday" }, { n: 3, s: "W", l: "Wednesday" },
+    { n: 4, s: "T", l: "Thursday" }, { n: 5, s: "F", l: "Friday" }, { n: 6, s: "S", l: "Saturday" }, { n: 7, s: "S", l: "Sunday" }
+];
+const COLS = {
+    1: { state: "state",  on: "on_angle",  off: "off_angle",  at: "updated_at",  inv: "invert1" },
+    2: { state: "state2", on: "on_angle2", off: "off_angle2", at: "updated_at2", inv: "invert2" }
+};
+
+const ui = {};
+for (const ch of CH) {
+    ui[ch] = {
+        unit: el("unit" + ch), plate: el("plate" + ch), state: el("state" + ch), changed: el("changed" + ch),
+        on: el("on" + ch), off: el("off" + ch), onOut: el("onOut" + ch), offOut: el("offOut" + ch), swap: el("swap" + ch),
+        hit: el(ch === 1 ? "hitLeft" : "hitRight"), tag: el(ch === 1 ? "tagLeftText" : "tagRightText")
+    };
+}
+const room = el("room");
+const msg = el("msg"), conn = el("conn"), connText = el("connText");
+const saveBtn = el("saveAngles"), anglesNote = el("anglesNote");
+const DEFAULT_NOTE = "On and Off match what this app shows.";
+
+const invert = { 1: true, 2: true };
+const current = { 1: null, 2: null };
+const shownNow = { 1: null, 2: null };
+const lastAt = { 1: undefined, 2: undefined };
+const busy = { 1: false, 2: false };
+const saved = { 1: null, 2: null };
+const swapping = { 1: false, 2: false };
+let blocked = false, ready = false, timer = null;
+let anglesDirty = false, savingAngles = false;
+
+// ---------- helpers ----------
+function formatChanged(iso) {
+    if (!iso) return "\u00a0";
+    const d = new Date(iso);
+    const now = new Date();
+    const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    if (d.toDateString() === now.toDateString()) return "Changed today at " + time;
+    if (d.toDateString() === yesterday.toDateString()) return "Changed yesterday at " + time;
+    return "Changed " + d.toLocaleDateString([], { day: "numeric", month: "short" }) + " at " + time;
+}
+function fmt12(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const ap = h >= 12 ? "PM" : "AM";
+    return ((h % 12) || 12) + ":" + String(m).padStart(2, "0") + " " + ap;
+}
+const toMin = hhmm => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+
+function syncPlates() {
+    for (const ch of CH) ui[ch].plate.disabled = blocked || busy[ch] || current[ch] === null;
+}
+function updateGlow() {
+    document.body.dataset.state = CH.some(c => shownNow[c] === "ON") ? "ON" : "OFF";
+}
+
+function render(ch, state, at) {
+    const u = ui[ch];
+    current[ch] = state;
+    const shown = invert[ch] ? (state === "ON" ? "OFF" : "ON") : state;
+    shownNow[ch] = shown;
+    const word = shown === "ON" ? "On" : "Off";
+    u.unit.dataset.state = shown;
+    room.dataset[ch === 1 ? "left" : "right"] = shown;
+    u.plate.setAttribute("aria-pressed", shown === "ON" ? "true" : "false");
+    u.plate.setAttribute("aria-label", NAME[ch] + ": " + (shown === "ON" ? "turn off" : "turn on"));
+    u.hit.setAttribute("aria-label", NAME[ch] + " are " + word.toLowerCase() + ". Tap to turn " + (shown === "ON" ? "off" : "on") + ".");
+    u.tag.textContent = NAME[ch] + " \u00b7 " + word;
+    u.state.textContent = word;
+    if (at !== undefined) { lastAt[ch] = at; u.changed.textContent = formatChanged(at); }
+    updateGlow();
+    syncPlates();
+}
+
+function setConnection(ok, label) {
+    conn.dataset.ok = ok ? "true" : "false";
+    connText.textContent = label || (ok ? "Connected" : "Offline");
+}
+function clearMessage() { msg.replaceChildren(); msg.dataset.kind = ""; }
+function showMessage(text, kind, actionLabel, action) {
+    msg.replaceChildren();
+    msg.dataset.kind = kind || "";
+    const p = document.createElement("div");
+    p.textContent = text;
+    msg.appendChild(p);
+    if (actionLabel) {
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = actionLabel; b.addEventListener("click", action);
+        msg.appendChild(b);
+    }
+}
+function setBlocked(v) { blocked = v; syncPlates(); syncSave(); syncTimerSave(); }
+
+function handleError(err, isWrite) {
+    const code = err && err.code;
+    const kind = isWrite ? "write" : "conn";
+    switch (code) {
+        case "needs_reauth":
+            setConnection(false, "Sign-in needed");
+            showMessage("Reconnect Supabase in claude.ai Settings → Connectors, then reopen this page.", "conn");
+            setBlocked(true); break;
+        case "server_not_connected":
+        case "selection_required":
+            setConnection(false, "Not connected");
+            showMessage("Add the Supabase connector in claude.ai Settings → Connectors to control the lights.", "conn");
+            setBlocked(true); break;
+        case "approval_required":
+            setConnection(false, "Needs approval");
+            showMessage("Supabase access needs your approval.", "conn", "Allow access", () => { clearMessage(); refresh(); });
+            break;
+        case "not_in_manifest": case "blocked_by_policy": case "not_granted":
+        case "capability_disabled": case "capability_removed": case "consent_required":
+            setConnection(false, "No access");
+            showMessage("This page isn't allowed to use Supabase here. Check the artifact's Permissions menu.", "conn");
+            setBlocked(true); break;
+        case "tool_error":
+            setConnection(true);
+            showMessage((isWrite ? "That didn't go through: " : "Couldn't read the lights: ") + (err.message || "Supabase refused the request."), kind);
+            break;
+        case "user_changed": break;
+        default:
+            setConnection(false);
+            showMessage(isWrite ? "The light may not have changed. Check its status, then try again."
+                                : "Can't reach Supabase right now. Retrying.", kind);
+    }
+}
+function saveErrorText(err) {
+    const code = err && err.code;
+    if (code === "tool_error") return "Not saved: " + (err.message || "Supabase refused the change.");
+    if (code === "needs_reauth") return "Not saved. Reconnect Supabase in claude.ai Settings → Connectors.";
+    if (code === "approval_required") return "Not saved. Approve Supabase access, then save again.";
+    if (code === "server_unavailable" || code === "upstream_error") return "May not have saved. Check again after the next refresh.";
+    return "Not saved. Check your connection and try again.";
+}
+
+// ---------- angles ----------
+function sliderToDb(ch) {
+    const a = Number(ui[ch].on.value), b = Number(ui[ch].off.value);
+    return invert[ch] ? { on: b, off: a } : { on: a, off: b };
+}
+function dbToSlider(ch, d) { return invert[ch] ? { on: d.off, off: d.on } : { on: d.on, off: d.off }; }
+function showAngles() {
+    for (const ch of CH) { ui[ch].onOut.textContent = ui[ch].on.value + "°"; ui[ch].offOut.textContent = ui[ch].off.value + "°"; }
+}
+function isDirty() {
+    return CH.some(ch => { const s = saved[ch]; if (!s) return false; const d = sliderToDb(ch); return d.on !== s.on || d.off !== s.off; });
+}
+function syncSave() { saveBtn.disabled = blocked || savingAngles || !anglesDirty; }
+function setAnglesNote(text, kind) { anglesNote.textContent = text; anglesNote.dataset.kind = kind || ""; }
+function placeSliders(ch) {
+    if (!saved[ch]) return;
+    const s = dbToSlider(ch, saved[ch]);
+    ui[ch].on.value = s.on; ui[ch].off.value = s.off;
+}
+function applyAngles(row) {
+    for (const ch of CH) {
+        const c = COLS[ch];
+        if (row[c.on] == null || row[c.off] == null) continue;
+        saved[ch] = { on: row[c.on], off: row[c.off] };
+        if (!anglesDirty && !savingAngles) placeSliders(ch);
+    }
+    showAngles();
+}
+function onSliderInput() {
+    showAngles(); anglesDirty = isDirty(); syncSave();
+    setAnglesNote(anglesDirty ? "Not saved yet" : DEFAULT_NOTE);
+}
+for (const ch of CH) {
+    ui[ch].on.addEventListener("input", onSliderInput);
+    ui[ch].off.addEventListener("input", onSliderInput);
+    ui[ch].swap.addEventListener("change", async () => {
+        const v = ui[ch].swap.checked;
+        swapping[ch] = true;
+        try {
+            await setInvertRemote(ch, v);
+            invert[ch] = v;
+            if (current[ch] !== null) render(ch, current[ch], lastAt[ch]);
+            if (!anglesDirty) { placeSliders(ch); showAngles(); }
+            setAnglesNote("Saved. The timer uses this too.");
+        } catch (err) {
+            ui[ch].swap.checked = !v;
+            setAnglesNote(saveErrorText(err), "err");
+        } finally { swapping[ch] = false; }
+    });
+}
+saveBtn.addEventListener("click", async () => {
+    savingAngles = true; syncSave(); setAnglesNote("Saving");
+    try {
+        for (const ch of CH) {
+            const d = sliderToDb(ch), s = saved[ch];
+            if (!s || d.on !== s.on || d.off !== s.off) { await saveAnglesRemote(ch, d.on, d.off); saved[ch] = d; }
+        }
+        setAnglesNote("Saved. The servos update within a few seconds.");
+    } catch (err) {
+        setAnglesNote(saveErrorText(err), "err");
+    } finally { savingAngles = false; anglesDirty = isDirty(); syncSave(); }
+});
+
+// ---------- timer ----------
+const timerOn = el("timerOn"), daysBox = el("days"), eventsBox = el("events");
+const addBtn = el("addEvent"), saveTimerBtn = el("saveTimer"), timerNote = el("timerNote"), timerNext = el("timerNext");
+const TIMER_NOTE = "Singapore time. Runs on the server, even when this app is closed.";
+let serverTimer = null;                 // last saved timer from the database
+let model = { enabled: true, days: [1, 2, 3, 4, 5], events: [] };
+let timerDirty = false, savingTimer = false;
+
+const dayBtns = DAYS.map(d => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "day"; b.textContent = d.s;
+    b.setAttribute("aria-label", d.l); b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => {
+        model.days = model.days.includes(d.n) ? model.days.filter(x => x !== d.n) : [...model.days, d.n].sort();
+        b.setAttribute("aria-pressed", model.days.includes(d.n) ? "true" : "false");
+        markTimerDirty();
+    });
+    daysBox.appendChild(b);
+    return b;
+});
+
+function cloneTimer(t) { return { enabled: t.enabled, days: [...t.days], events: t.events.map(e => ({ ...e })) }; }
+function sameTimer(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+function eventRow(e, i) {
+    const row = document.createElement("div");
+    row.className = "event";
+    const t = document.createElement("input");
+    t.type = "time"; t.step = 60; t.value = e.t; t.setAttribute("aria-label", "Time");
+    t.addEventListener("input", () => { model.events[i].t = t.value; markTimerDirty(); });
+    const a = document.createElement("select");
+    a.setAttribute("aria-label", "Turn on or off");
+    a.innerHTML = '<option value="ON">On</option><option value="OFF">Off</option>';
+    a.value = e.a;
+    a.addEventListener("change", () => { model.events[i].a = a.value; markTimerDirty(); });
+    const g = document.createElement("select");
+    g.setAttribute("aria-label", "Which lights");
+    g.innerHTML = '<option value="both">Both</option><option value="left">Squares</option><option value="right">Wall</option>';
+    g.value = e.g;
+    g.addEventListener("change", () => { model.events[i].g = g.value; markTimerDirty(); });
+    const del = document.createElement("button");
+    del.type = "button"; del.className = "del"; del.textContent = "×";
+    del.setAttribute("aria-label", "Remove " + (e.t ? fmt12(e.t) : "this time"));
+    del.addEventListener("click", () => { model.events.splice(i, 1); renderTimer(); markTimerDirty(); });
+    row.append(t, a, g, del);
+    return row;
+}
+function renderTimer() {
+    timerOn.checked = model.enabled;
+    DAYS.forEach((d, i) => dayBtns[i].setAttribute("aria-pressed", model.days.includes(d.n) ? "true" : "false"));
+    eventsBox.replaceChildren(...model.events.map(eventRow));
+    syncTimerSave();
+}
+function syncTimerSave() { saveTimerBtn.disabled = blocked || savingTimer || !timerDirty; }
+function setTimerNote(text, kind) { timerNote.textContent = text; timerNote.dataset.kind = kind || ""; }
+function markTimerDirty() {
+    timerDirty = !serverTimer || !sameTimer(model, serverTimer);
+    syncTimerSave();
+    setTimerNote(timerDirty ? "Not saved yet" : TIMER_NOTE);
+}
+timerOn.addEventListener("change", () => { model.enabled = timerOn.checked; markTimerDirty(); });
+addBtn.addEventListener("click", () => {
+    if (model.events.length >= 20) return;
+    model.events.push({ t: "08:00", a: "ON", g: "both" });
+    renderTimer(); markTimerDirty();
+    const inputs = eventsBox.querySelectorAll("input[type=time]");
+    if (inputs.length) inputs[inputs.length - 1].focus();
+});
+saveTimerBtn.addEventListener("click", async () => {
+    if (model.events.some(e => !/^\d{2}:\d{2}$/.test(e.t))) { setTimerNote("Every row needs a time.", "err"); return; }
+    model.events.sort((x, y) => toMin(x.t) - toMin(y.t));
+    savingTimer = true; syncTimerSave(); setTimerNote("Saving");
+    try {
+        await saveTimerRemote(model.enabled, model.days, model.events);
+        serverTimer = cloneTimer(model);
+        timerDirty = false;
+        renderTimer();
+        setTimerNote("Saved. " + TIMER_NOTE);
+        updateNext();
+    } catch (err) {
+        setTimerNote(saveErrorText(err), "err");
+    } finally { savingTimer = false; syncTimerSave(); }
+});
+
+function sgClock() {
+    const f = new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    const p = Object.fromEntries(f.formatToParts(new Date()).map(x => [x.type, x.value]));
+    const dow = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 }[p.weekday];
+    return { dow, min: (Number(p.hour) % 24) * 60 + Number(p.minute) };
+}
+function nextEvent(t) {
+    if (!t || !t.enabled || !t.events.length || !t.days.length) return null;
+    const now = sgClock();
+    const evs = [...t.events].sort((a, b) => toMin(a.t) - toMin(b.t));
+    for (let o = 0; o <= 7; o++) {
+        const dow = ((now.dow - 1 + o) % 7) + 1;
+        if (!t.days.includes(dow)) continue;
+        for (const e of evs) if (o > 0 || toMin(e.t) > now.min) return { o, dow, e };
+    }
+    return null;
+}
+function updateNext() {
+    timerNext.replaceChildren();
+    if (!serverTimer) { timerNext.textContent = "Loading…"; return; }
+    if (!serverTimer.enabled) { timerNext.textContent = "Timer is off."; return; }
+    const n = nextEvent(serverTimer);
+    if (!n) { timerNext.textContent = "No upcoming times."; return; }
+    const when = n.o === 0 ? "today" : n.o === 1 ? "tomorrow" : DAYS[n.dow - 1].l;
+    timerNext.append("Next: ");
+    const s = document.createElement("strong");
+    s.textContent = TARGET[n.e.g] + " " + (n.e.a === "ON" ? "on" : "off");
+    timerNext.append(s, " " + when + " at " + fmt12(n.e.t));
+}
+function applyTimer(row, events) {
+    if (typeof row.timer_enabled !== "boolean") return;
+    serverTimer = {
+        enabled: row.timer_enabled,
+        days: (row.timer_days || []).map(Number).sort(),
+        events: events.map(e => ({ t: e.t, a: e.a, g: e.g })).sort((x, y) => toMin(x.t) - toMin(y.t))
+    };
+    if (!timerDirty && !savingTimer) { model = cloneTimer(serverTimer); renderTimer(); }
+    updateNext();
+}
+
+// ---------- refresh and toggle ----------
+async function refresh(retried) {
+    if (!ready) return;
+    try {
+        const data = await fetchAll();
+        setConnection(true);
+        if (blocked) setBlocked(false);
+        const row = data && data.row;
+        if (!row) return;
+        for (const ch of CH) {
+            const v = row[COLS[ch].inv];
+            if (typeof v === "boolean" && !swapping[ch]) { invert[ch] = v; ui[ch].swap.checked = v; }
+        }
+        applyAngles(row);
+        for (const ch of CH) if (!busy[ch]) render(ch, row[COLS[ch].state], row[COLS[ch].at]);
+        applyTimer(row, data.events || []);
+        if (msg.dataset.kind === "conn") clearMessage();
+    } catch (err) {
+        if (err && err.retryable && !retried) {
+            setTimeout(() => refresh(true), (err.retryAfterMs || 0) + 500 + Math.random() * 1000);
+            return;
+        }
+        handleError(err, false);
+    }
+}
+
+async function toggle(ch) {
+    if (!ready || busy[ch] || current[ch] === null || blocked) return;
+    const previous = current[ch];
+    const next = previous === "ON" ? "OFF" : "ON";
+    busy[ch] = true;
+    clearMessage();
+    if (navigator.vibrate) navigator.vibrate(12);
+    render(ch, next);
+    ui[ch].changed.textContent = "Sending";
+    try {
+        await setLightRemote(ch, next);
+        setConnection(true);
+        render(ch, next, new Date().toISOString());
+    } catch (err) {
+        render(ch, previous, lastAt[ch]);
+        handleError(err, true);
+    } finally {
+        busy[ch] = false; syncPlates(); refresh();
+    }
+}
+
+for (const ch of CH) {
+    ui[ch].plate.addEventListener("click", () => toggle(ch));
+    ui[ch].hit.addEventListener("click", () => toggle(ch));
+    ui[ch].hit.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(ch); }
+    });
+}
+
+function startPolling() {
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => { if (!document.hidden) refresh(); else updateNext(); }, REFRESH_MS);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+renderTimer();
+
+ready = true;
+refresh();
+startPolling();
+</script>
+</body>
+</html>
