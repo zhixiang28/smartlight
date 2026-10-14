@@ -681,10 +681,13 @@ function markTimerDirty() {
 timerOn.addEventListener("change", () => { model.enabled = timerOn.checked; markTimerDirty(); });
 addBtn.addEventListener("click", () => {
     if (model.events.length >= 20) return;
-    model.events.push({ t: "08:00", a: "ON", g: "both" });
+    const added = { t: "08:00", a: "ON", g: "both" };
+    model.events.push(added);
+    model.events.sort((x, y) => toMin(x.t) - toMin(y.t));   // stable: new row lands after equal times
     renderTimer(); markTimerDirty();
     const inputs = eventsBox.querySelectorAll("input[type=time]");
-    if (inputs.length) inputs[inputs.length - 1].focus();
+    const at = model.events.indexOf(added);
+    if (inputs[at]) inputs[at].focus();
 });
 saveTimerBtn.addEventListener("click", async () => {
     if (model.events.some(e => !/^\d{2}:\d{2}$/.test(e.t))) { setTimerNote("Every row needs a time.", "err"); return; }
@@ -738,7 +741,9 @@ function applyTimer(row, events) {
         days: (row.timer_days || []).map(Number).sort(),
         events: events.map(e => ({ t: e.t, a: e.a, g: e.g })).sort((x, y) => toMin(x.t) - toMin(y.t))
     };
-    if (!timerDirty && !savingTimer) { model = cloneTimer(serverTimer); renderTimer(); }
+    // Never rebuild the rows while the user is editing in them (it drops focus and closes the time picker).
+    const editing = eventsBox.contains(document.activeElement) || daysBox.contains(document.activeElement);
+    if (!timerDirty && !savingTimer && !editing && !sameTimer(model, serverTimer)) { model = cloneTimer(serverTimer); renderTimer(); }
     updateNext();
 }
 
