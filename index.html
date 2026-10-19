@@ -208,6 +208,26 @@ footer { text-align: center; font-size: 13px; color: var(--muted); padding: 0 0 
 
 @media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; } }
 
+/* ---------- Sign in ---------- */
+body[data-auth="out"] main, body[data-auth="out"] footer, body[data-auth="out"] #conn, body[data-auth="out"] #userChip { display: none; }
+body[data-auth="in"] #auth { display: none; }
+.user-chip { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.user-chip button { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--plate-edge); background: var(--plate); color: var(--ink); cursor: pointer; }
+.auth { max-width: 360px; margin: 18px auto 40px; padding: 22px 20px; background: var(--plate); border: 1px solid var(--plate-edge); border-radius: 18px; position: relative; }
+.auth h2 { margin: 0 0 4px; font-size: 19px; font-weight: 600; }
+.auth .auth-sub { margin: 0 0 16px; font-size: 14px; color: var(--muted); }
+.auth form { display: flex; flex-direction: column; gap: 12px; }
+.auth label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--muted); }
+.auth input { font: inherit; font-size: 16px; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--plate-edge); background: var(--wall); color: var(--ink); width: 100%; }
+.auth input:focus-visible { outline: 3px solid var(--amber); outline-offset: 1px; }
+.auth .auth-go { font: inherit; font-size: 16px; font-weight: 600; padding: 12px; border-radius: 10px; border: 0; background: var(--amber); color: #2a1b00; cursor: pointer; }
+.auth .auth-go:disabled { opacity: 0.55; cursor: progress; }
+.auth .auth-msg { min-height: 18px; margin: 0; font-size: 14px; color: var(--err); }
+.auth .auth-msg[data-kind="ok"] { color: var(--ok); }
+.auth .auth-links { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 14px; font-size: 14px; }
+.auth .link { font: inherit; padding: 0; border: 0; background: none; color: var(--ink); text-decoration: underline; cursor: pointer; }
+.auth [hidden] { display: none !important; }
+.auth .code-input { letter-spacing: 6px; text-align: center; font-size: 22px; }
 </style>
 </head>
 <body data-state="unknown">
@@ -218,7 +238,48 @@ footer { text-align: center; font-size: 13px; color: var(--muted); padding: 0 0 
         <p>Smart lights</p>
     </div>
     <div class="conn" id="conn"><span class="conn-dot"></span><span id="connText">Connecting</span></div>
+    <div class="user-chip" id="userChip"><span id="userName"></span><button type="button" id="signOut">Sign out</button></div>
 </header>
+
+<section class="auth" id="auth" aria-live="polite">
+    <div id="stepLogin">
+        <h2>Sign in</h2>
+        <p class="auth-sub">Use your MR Tracker account.</p>
+        <form id="loginForm" novalidate>
+            <label>Email<input id="loginEmail" type="email" autocomplete="username" inputmode="email" placeholder="you@spacelogic.com.sg" required></label>
+            <label>PIN<input id="loginPin" type="password" autocomplete="current-password" inputmode="numeric" maxlength="4" pattern="\d{4}" required></label>
+            <p class="auth-msg" id="loginMsg"></p>
+            <button class="auth-go" id="loginGo" type="submit">Sign in</button>
+        </form>
+        <div class="auth-links"><span>No account?</span><button type="button" class="link" id="toSignup">Sign up</button></div>
+    </div>
+    <div id="stepSignup" hidden>
+        <h2>Create account</h2>
+        <p class="auth-sub">Same account as MR Tracker. Company email only.</p>
+        <form id="signupForm" novalidate>
+            <label>Name<input id="signupName" type="text" autocomplete="name" required></label>
+            <label>Email<input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@spacelogic.com.sg" required></label>
+            <label>4-digit PIN<input id="signupPin" type="password" autocomplete="new-password" inputmode="numeric" maxlength="4" pattern="\d{4}" required></label>
+            <p class="auth-msg" id="signupMsg"></p>
+            <button class="auth-go" id="signupGo" type="submit">Send verification code</button>
+        </form>
+        <div class="auth-links"><span>Have an account?</span><button type="button" class="link" id="toLogin1">Sign in</button></div>
+    </div>
+    <div id="stepVerify" hidden>
+        <h2>Check your email</h2>
+        <p class="auth-sub" id="verifySub">Enter the 6-digit code we sent.</p>
+        <form id="verifyForm" novalidate>
+            <label>Code<input id="verifyCode" class="code-input" type="text" autocomplete="one-time-code" inputmode="numeric" maxlength="6" required></label>
+            <p class="auth-msg" id="verifyMsg"></p>
+            <button class="auth-go" id="verifyGo" type="submit">Verify and sign in</button>
+        </form>
+        <div class="auth-links">
+            <button type="button" class="link" id="resendCode">Send a new code</button>
+            <button type="button" class="link" id="manualVerify">Didn't get it? Ask an admin to verify</button>
+            <button type="button" class="link" id="toLogin2">Back</button>
+        </div>
+    </div>
+</section>
 
 <main>
     <div class="room-card">
@@ -400,20 +461,29 @@ async function fetchAll() {
     ]);
     return { row: rows[0], events: sched.map(e => ({ t: String(e.at_time).slice(0, 5), a: e.action, g: e.target })) };
 }
-async function rpc(name, args) {
+async function rpcJson(name, args) {
     const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, {
         method: "POST",
         headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
         body: JSON.stringify(args)
     });
-    if (!res.ok) throw new Error("HTTP " + res.status);
+    if (!res.ok) {
+        let m = "";
+        try { m = (await res.json()).message || ""; } catch (_) {}
+        const err = new Error(m || "HTTP " + res.status);
+        err.status = res.status;
+        if (/not signed in/i.test(m)) { err.code = "not_signed_in"; signOut("Your sign-in expired. Please sign in again."); }
+        throw err;
+    }
+    return res.json().catch(() => null);
 }
-const setLightRemote = (ch, state) => rpc("set_light_ch", { pin: PIN, ch, new_state: state });
-const saveAnglesRemote = (ch, on, off) => rpc("set_angles_ch", { pin: PIN, ch, new_on: Math.round(on), new_off: Math.round(off) });
-const setInvertRemote = (ch, inv) => rpc("set_invert", { pin: PIN, ch, inv });
-const saveTimerRemote = (enabled, days, events) => rpc("save_timer", { pin: PIN, enabled, days, events });
+const rpc = rpcJson;
+const setLightRemote = (ch, state) => rpc("light_set", { ...cred(), ch, new_state: state });
+const saveAnglesRemote = (ch, on, off) => rpc("light_save_angles", { ...cred(), ch, new_on: Math.round(on), new_off: Math.round(off) });
+const setInvertRemote = (ch, inv) => rpc("light_set_invert", { ...cred(), ch, inv });
+const saveTimerRemote = (enabled, days, events) => rpc("light_save_timer", { ...cred(), enabled, days, events });
 
-const PIN = "HDF85FGYI0";
+const cred = () => ({ p_person_id: session.id, p_pin: session.pin });
 const TZ = "Asia/Singapore";
 // ------------------
 
@@ -811,9 +881,114 @@ function startPolling() {
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 renderTimer();
 
+// ---------- sign in ----------
+const SESSION_KEY = "smartlight.session";
+let session = null;
+try { session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch (_) {}
+if (!session || !session.id || !session.pin) session = null;
+const authBox = el("auth"), userName = el("userName");
+const steps = { login: el("stepLogin"), signup: el("stepSignup"), verify: el("stepVerify") };
+let pending = null;                      // { email, pin } while verifying a new account
+
+function showStep(name) { for (const k in steps) steps[k].hidden = k !== name; }
+function authMsg(id, text, kind) { const m = el(id); m.textContent = text || ""; m.dataset.kind = kind || ""; }
+function setSession(next) {
+    session = next;
+    try { next ? localStorage.setItem(SESSION_KEY, JSON.stringify(next)) : localStorage.removeItem(SESSION_KEY); } catch (_) {}
+    document.body.dataset.auth = next ? "in" : "out";
+    userName.textContent = next ? next.name : "";
+    if (next) { clearMessage(); refresh(); startPolling(); }
+    else { if (timer) { clearInterval(timer); timer = null; } }
+}
+function signOut(notice) {
+    setSession(null);
+    showStep("login");
+    authMsg("loginMsg", notice || "", notice ? "err" : "");
+    el("loginPin").value = "";
+}
+async function busyForm(btnId, fn) {
+    const b = el(btnId); b.disabled = true;
+    try { await fn(); } finally { b.disabled = false; }
+}
+const friendly = err => (err && err.status ? err.message : "Can't reach the server. Check your connection and try again.");
+
+el("loginForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const email = el("loginEmail").value.trim(), pin = el("loginPin").value.trim();
+    if (!email || !/^\d{4}$/.test(pin)) { authMsg("loginMsg", "Enter your email and 4-digit PIN.", "err"); return; }
+    authMsg("loginMsg", "");
+    busyForm("loginGo", async () => {
+        try {
+            const r = await rpcJson("login_by_email", { p_email: email, p_pin: pin });
+            if (!r || !r.success) { authMsg("loginMsg", (r && r.error) || "Incorrect email or PIN.", "err"); return; }
+            el("loginPin").value = "";
+            setSession({ id: r.id, name: r.name, pin });
+        } catch (err) { authMsg("loginMsg", friendly(err), "err"); }
+    });
+});
+
+el("toSignup").addEventListener("click", () => { authMsg("signupMsg", ""); showStep("signup"); });
+el("toLogin1").addEventListener("click", () => showStep("login"));
+el("toLogin2").addEventListener("click", () => showStep("login"));
+
+el("signupForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const name = el("signupName").value.trim(), email = el("signupEmail").value.trim(), pin = el("signupPin").value.trim();
+    if (!name || !email) { authMsg("signupMsg", "Name and email are required.", "err"); return; }
+    if (!/^\d{4}$/.test(pin)) { authMsg("signupMsg", "PIN must be exactly 4 digits.", "err"); return; }
+    authMsg("signupMsg", "");
+    busyForm("signupGo", async () => {
+        try {
+            const r = await rpcJson("start_registration", { p_name: name, p_pin: pin, p_email: email });
+            if (!r || !r.success) { authMsg("signupMsg", (r && r.error) || "Couldn't start sign-up.", "err"); return; }
+            pending = { email: r.email, pin };
+            const sent = await rpcJson("resend_registration_code", { p_email: r.email });   // emails a fresh code
+            el("verifySub").textContent = "Enter the 6-digit code we sent to " + r.email + ".";
+            el("verifyCode").value = ""; authMsg("verifyMsg", sent && sent.success ? "" : ((sent && sent.error) || "Couldn't send the email. Try 'Send a new code'."), "err");
+            showStep("verify"); el("verifyCode").focus();
+        } catch (err) { authMsg("signupMsg", friendly(err), "err"); }
+    });
+});
+
+el("verifyForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const code = el("verifyCode").value.trim();
+    if (!pending || !/^\d{6}$/.test(code)) { authMsg("verifyMsg", "Enter the 6-digit code.", "err"); return; }
+    authMsg("verifyMsg", "");
+    busyForm("verifyGo", async () => {
+        try {
+            const r = await rpcJson("verify_registration", { p_email: pending.email, p_code: code });
+            if (!r || !r.success) { authMsg("verifyMsg", (r && r.error) || "Incorrect code.", "err"); return; }
+            const pin = pending.pin; pending = null;
+            setSession({ id: r.id, name: r.name, pin });
+        } catch (err) { authMsg("verifyMsg", friendly(err), "err"); }
+    });
+});
+el("resendCode").addEventListener("click", async () => {
+    if (!pending) return;
+    try {
+        const r = await rpcJson("resend_registration_code", { p_email: pending.email });
+        authMsg("verifyMsg", r && r.success ? "New code sent." : ((r && r.error) || "Couldn't send the email."), r && r.success ? "ok" : "err");
+    } catch (err) { authMsg("verifyMsg", friendly(err), "err"); }
+});
+el("manualVerify").addEventListener("click", async () => {
+    if (!pending) return;
+    try {
+        const r = await rpcJson("request_manual_verification", { p_email: pending.email });
+        authMsg("verifyMsg", r && r.success ? "Request sent. Once an admin approves it, sign in with your email and PIN." : ((r && r.error) || "Couldn't send the request."), r && r.success ? "ok" : "err");
+    } catch (err) { authMsg("verifyMsg", friendly(err), "err"); }
+});
+el("signOut").addEventListener("click", () => signOut());
+
 ready = true;
-refresh();
-startPolling();
+document.body.dataset.auth = "out";
+if (session) {
+    // Show the app straight away, then confirm the saved sign-in is still valid.
+    setSession(session);
+    rpcJson("login_person", { p_person_id: session.id, p_pin: session.pin })
+        .then(r => { if (r && r.success === false) signOut("Please sign in again."); })
+        .catch(() => {});
+}
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 </script>
