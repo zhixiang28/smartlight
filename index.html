@@ -209,8 +209,12 @@ footer { text-align: center; font-size: 13px; color: var(--muted); padding: 0 0 
 @media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; } }
 
 /* ---------- Sign in ---------- */
-body[data-auth="out"] main, body[data-auth="out"] footer, body[data-auth="out"] #conn, body[data-auth="out"] #userChip { display: none; }
-body[data-auth="in"] #auth { display: none; }
+/* Signed out: lights are visible read-only; controls need a sign-in. */
+body[data-auth="out"] #userChip, body[data-auth="out"] .card.timer, body[data-auth="out"] .angles { display: none; }
+body[data-auth="in"] #auth, body[data-auth="in"] #signInBtn, body[data-auth="out"]:not([data-login="open"]) #auth { display: none; }
+body[data-login="open"] main, body[data-login="open"] footer, body[data-login="open"] #signInBtn { display: none; }
+.head-right { display: flex; align-items: center; gap: 12px; }
+#signInBtn { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--plate-edge); background: var(--plate); color: var(--ink); cursor: pointer; }
 .user-chip { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .user-chip button { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--plate-edge); background: var(--plate); color: var(--ink); cursor: pointer; }
 .auth { max-width: 360px; margin: 18px auto 40px; padding: 22px 20px; background: var(--plate); border: 1px solid var(--plate-edge); border-radius: 18px; position: relative; }
@@ -237,8 +241,11 @@ body[data-auth="in"] #auth { display: none; }
         <h1>Maker Space</h1>
         <p>Smart lights</p>
     </div>
-    <div class="conn" id="conn"><span class="conn-dot"></span><span id="connText">Connecting</span></div>
-    <div class="user-chip" id="userChip"><span id="userName"></span><button type="button" id="signOut">Sign out</button></div>
+    <div class="head-right">
+        <div class="conn" id="conn"><span class="conn-dot"></span><span id="connText">Connecting</span></div>
+        <div class="user-chip" id="userChip"><span id="userName"></span><button type="button" id="signOut">Sign out</button></div>
+        <button type="button" id="signInBtn">Sign in</button>
+    </div>
 </header>
 
 <section class="auth" id="auth" aria-live="polite">
@@ -251,7 +258,7 @@ body[data-auth="in"] #auth { display: none; }
             <p class="auth-msg" id="loginMsg"></p>
             <button class="auth-go" id="loginGo" type="submit">Sign in</button>
         </form>
-        <div class="auth-links"><span>No account?</span><button type="button" class="link" id="toSignup">Sign up</button></div>
+        <div class="auth-links"><span>No account?</span><button type="button" class="link" id="toSignup">Sign up</button><button type="button" class="link" id="cancelLogin">Cancel</button></div>
     </div>
     <div id="stepSignup" hidden>
         <h2>Create account</h2>
@@ -846,6 +853,7 @@ async function refresh(retried) {
 }
 
 async function toggle(ch) {
+    if (!session) { openLogin(); return; }
     if (!ready || busy[ch] || current[ch] === null || blocked) return;
     const previous = current[ch];
     const next = previous === "ON" ? "OFF" : "ON";
@@ -896,14 +904,20 @@ function setSession(next) {
     session = next;
     try { next ? localStorage.setItem(SESSION_KEY, JSON.stringify(next)) : localStorage.removeItem(SESSION_KEY); } catch (_) {}
     document.body.dataset.auth = next ? "in" : "out";
+    delete document.body.dataset.login;
     userName.textContent = next ? next.name : "";
-    if (next) { clearMessage(); refresh(); startPolling(); }
-    else { if (timer) { clearInterval(timer); timer = null; } }
+    clearMessage(); refresh();
 }
+function openLogin() {
+    showStep("login");
+    document.body.dataset.login = "open";
+    window.scrollTo(0, 0);
+    el("loginEmail").focus();
+}
+function closeLogin() { delete document.body.dataset.login; }
 function signOut(notice) {
     setSession(null);
-    showStep("login");
-    authMsg("loginMsg", notice || "", notice ? "err" : "");
+    if (notice) { openLogin(); authMsg("loginMsg", notice, "err"); } else authMsg("loginMsg", "");
     el("loginPin").value = "";
 }
 async function busyForm(btnId, fn) {
@@ -929,7 +943,9 @@ el("loginForm").addEventListener("submit", e => {
 
 el("toSignup").addEventListener("click", () => { authMsg("signupMsg", ""); showStep("signup"); });
 el("toLogin1").addEventListener("click", () => showStep("login"));
-el("toLogin2").addEventListener("click", () => showStep("login"));
+el("signInBtn").addEventListener("click", openLogin);
+el("cancelLogin").addEventListener("click", closeLogin);
+el("toLogin2").addEventListener("click", () => { pending = null; showStep("login"); });
 
 el("signupForm").addEventListener("submit", e => {
     e.preventDefault();
@@ -981,14 +997,16 @@ el("manualVerify").addEventListener("click", async () => {
 el("signOut").addEventListener("click", () => signOut());
 
 ready = true;
-document.body.dataset.auth = "out";
+document.body.dataset.auth = session ? "in" : "out";
 if (session) {
-    // Show the app straight away, then confirm the saved sign-in is still valid.
-    setSession(session);
+    userName.textContent = session.name;
+    // Confirm the saved sign-in is still valid.
     rpcJson("login_person", { p_person_id: session.id, p_pin: session.pin })
         .then(r => { if (r && r.success === false) signOut("Please sign in again."); })
         .catch(() => {});
 }
+refresh();
+startPolling();
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 </script>
