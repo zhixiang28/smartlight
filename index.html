@@ -232,6 +232,18 @@ body[data-login="open"] main, body[data-login="open"] footer, body[data-login="o
 .auth .link { font: inherit; padding: 0; border: 0; background: none; color: var(--ink); text-decoration: underline; cursor: pointer; }
 .auth [hidden] { display: none !important; }
 .auth .code-input { letter-spacing: 6px; text-align: center; font-size: 22px; }
+.net-card h2 { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
+.net-card p { margin: 0 0 10px; font-size: 14px; color: var(--muted); }
+.net-card .net-add { display: flex; gap: 8px; margin-bottom: 12px; }
+.net-card input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--plate-edge); background: var(--wall); color: var(--ink); }
+.net-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.net-card li { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; }
+.net-card li span small { display: block; color: var(--muted); font-size: 12px; }
+.net-card button { font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--plate-edge); background: var(--plate); color: var(--ink); cursor: pointer; }
+.net-card[hidden] { display: none; }
+.net-note { min-height: 18px; font-size: 13px; color: var(--err); }
+.net-note[data-kind="ok"] { color: var(--ok); }
+body[data-auth="out"] #netCard { display: none; }
 </style>
 </head>
 <body data-state="unknown">
@@ -448,6 +460,17 @@ body[data-login="open"] main, body[data-login="open"] footer, body[data-login="o
     </details>
 </main>
 
+<section class="card net-card" id="netCard" hidden aria-labelledby="netTitle" style="max-width:560px;margin:0 auto 24px">
+    <h2 id="netTitle">Trusted networks</h2>
+    <p id="netYou">Checking this network…</p>
+    <div class="net-add">
+        <input id="netLabel" type="text" placeholder="Name, e.g. SL-Office" maxlength="40" aria-label="Network name">
+        <button type="button" id="netAdd">Allow this network</button>
+    </div>
+    <div class="net-note" id="netNote" aria-live="polite"></div>
+    <ul id="netList"></ul>
+</section>
+
 <footer>Lights follow within a few seconds.</footer>
 
 <script>
@@ -479,13 +502,14 @@ async function rpcJson(name, args) {
         try { m = (await res.json()).message || ""; } catch (_) {}
         const err = new Error(m || "HTTP " + res.status);
         err.status = res.status;
+        if (/not on a trusted network/i.test(m)) { err.code = "not_trusted"; setTrusted(false); if (!session) openLogin(); }
         if (/not signed in/i.test(m)) { err.code = "not_signed_in"; signOut("Your sign-in expired. Please sign in again."); }
         throw err;
     }
     return res.json().catch(() => null);
 }
 const rpc = rpcJson;
-const setLightRemote = (ch, state) => rpc("light_set", { ...cred(), ch, new_state: state });
+const setLightRemote = (ch, state) => session ? rpc("light_set", { ...cred(), ch, new_state: state }) : rpc("light_set_net", { ch, new_state: state });
 const saveAnglesRemote = (ch, on, off) => rpc("light_save_angles", { ...cred(), ch, new_on: Math.round(on), new_off: Math.round(off) });
 const setInvertRemote = (ch, inv) => rpc("light_set_invert", { ...cred(), ch, inv });
 const saveTimerRemote = (enabled, days, events) => rpc("light_save_timer", { ...cred(), enabled, days, events });
@@ -853,7 +877,7 @@ async function refresh(retried) {
 }
 
 async function toggle(ch) {
-    if (!session) { openLogin(); return; }
+    if (!session && !trusted) { openLogin(); return; }
     if (!ready || busy[ch] || current[ch] === null || blocked) return;
     const previous = current[ch];
     const next = previous === "ON" ? "OFF" : "ON";
@@ -907,6 +931,7 @@ function setSession(next) {
     delete document.body.dataset.login;
     userName.textContent = next ? next.name : "";
     clearMessage(); refresh();
+    if (typeof setTrusted === "function") { setTrusted(trusted); loadNetworks(); }
 }
 function openLogin() {
     showStep("login");
@@ -996,6 +1021,61 @@ el("manualVerify").addEventListener("click", async () => {
 });
 el("signOut").addEventListener("click", () => signOut());
 
+
+// ---------- trusted networks ----------
+const roomHint = document.querySelector(".room-hint");
+const HINT_DEFAULT = roomHint ? roomHint.textContent : "";
+let trusted = false;
+function setTrusted(v) {
+    trusted = !!v;
+    if (roomHint) roomHint.textContent = (!session && !trusted) ? "Sign in to switch the lights." : HINT_DEFAULT;
+}
+async function checkNetwork() {
+    try { const r = await rpcJson("network_status", {}); setTrusted(r && r.trusted); } catch (_) { /* keep last answer */ }
+}
+const netCard = el("netCard"), netList = el("netList"), netNote = el("netNote");
+function netMsg(t, kind) { netNote.textContent = t || ""; netNote.dataset.kind = kind || ""; }
+async function loadNetworks() {
+    netCard.hidden = true;
+    if (!session) return;
+    try {
+        const r = await rpcJson("admin_list_networks", cred_admin());
+        netCard.hidden = false;
+        el("netYou").textContent = r.you
+            ? "This device's network address: " + r.you + (r.trusted ? " (trusted)" : " (not trusted)")
+            : "Can't detect this network's address.";
+        netList.replaceChildren(...(r.networks || []).map(n => {
+            const li = document.createElement("li");
+            const info = document.createElement("span");
+            info.textContent = n.label;
+            const sm = document.createElement("small"); sm.textContent = n.net; info.appendChild(sm);
+            const b = document.createElement("button"); b.type = "button"; b.textContent = "Remove";
+            b.addEventListener("click", async () => {
+                b.disabled = true;
+                try { await rpcJson("admin_remove_network", { ...cred_admin(), p_id: n.id }); await loadNetworks(); await checkNetwork(); }
+                catch (err) { netMsg(friendly(err), "err"); b.disabled = false; }
+            });
+            li.append(info, b);
+            return li;
+        }));
+    } catch (_) { /* not an admin: keep the card hidden */ }
+}
+const cred_admin = () => ({ p_admin_id: session.id, p_admin_pin: session.pin });
+el("netAdd").addEventListener("click", async () => {
+    const label = el("netLabel").value.trim();
+    if (!label) { netMsg("Give this network a name first.", "err"); return; }
+    const btn = el("netAdd"); btn.disabled = true; netMsg("");
+    try {
+        const r = await rpcJson("admin_allow_network", { ...cred_admin(), p_label: label });
+        el("netLabel").value = "";
+        netMsg("Allowed " + (r && r.net ? r.net : "this network") + ".", "ok");
+        await loadNetworks(); await checkNetwork();
+    } catch (err) { netMsg(friendly(err), "err"); }
+    finally { btn.disabled = false; }
+});
+window.addEventListener("online", checkNetwork);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkNetwork(); });
+
 ready = true;
 document.body.dataset.auth = session ? "in" : "out";
 if (session) {
@@ -1007,6 +1087,9 @@ if (session) {
 }
 refresh();
 startPolling();
+setTrusted(false);
+checkNetwork();
+if (session) loadNetworks();
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 </script>
