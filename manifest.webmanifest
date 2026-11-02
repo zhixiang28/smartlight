@@ -1,7 +1,7 @@
 {
-  "name": "Maker Space Lights",
-  "short_name": "Maker Space",
-  "description": "Control the Maker Space lights and timer.",
+  "name": "Makerspace Lights",
+  "short_name": "Makerspace",
+  "description": "Control the Makerspace lights and timer.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
