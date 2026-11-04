@@ -232,6 +232,14 @@ body[data-login="open"] main, body[data-login="open"] footer, body[data-login="o
 .auth .link { font: inherit; padding: 0; border: 0; background: none; color: var(--ink); text-decoration: underline; cursor: pointer; }
 .auth [hidden] { display: none !important; }
 .auth .code-input { letter-spacing: 6px; text-align: center; font-size: 22px; }
+.away { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--plate-edge); }
+.away h3 { margin: 0 0 2px; font-size: 15px; font-weight: 600; }
+.away-help { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+.away-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.away-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 36px; gap: 6px; align-items: center; }
+.away-row span { font-size: 13px; color: var(--muted); }
+.away-row input { font: inherit; font-size: 15px; padding: 8px 8px; border-radius: 10px; border: 1px solid var(--plate-edge); background: var(--wall); color: var(--ink); min-width: 0; width: 100%; }
+.away-row input:focus-visible { outline: 3px solid var(--amber); outline-offset: 1px; }
 .net-card h2 { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
 .net-card p { margin: 0 0 10px; font-size: 14px; color: var(--muted); }
 .net-card .net-add { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -418,6 +426,12 @@ body[data-auth="out"] #netCard { display: none; }
         <p class="timer-next" id="timerNext" aria-live="polite">Loading…</p>
         <div class="days" id="days" role="group" aria-label="Days the timer runs"></div>
         <div class="events" id="events"></div>
+        <div class="away" id="awayBox">
+            <h3>Away / holiday</h3>
+            <p class="away-help">Nobody in? The lights won't turn on during these dates. Off times still run, so nothing is left on.</p>
+            <div class="away-list" id="awayList"></div>
+            <button type="button" class="ghost" id="addAway">Add away dates</button>
+        </div>
         <div class="timer-actions">
             <button type="button" class="ghost" id="addEvent">Add time</button>
             <button type="button" class="save" id="saveTimer" disabled>Save timer</button>
@@ -486,7 +500,7 @@ async function getJson(path) {
 }
 async function fetchAll() {
     const [rows, sched] = await Promise.all([
-        getJson("/rest/v1/smartlight?id=eq.1&select=state,state2,updated_at,updated_at2,on_angle,off_angle,on_angle2,off_angle2,invert1,invert2,timer_enabled,timer_days"),
+        getJson("/rest/v1/smartlight?id=eq.1&select=state,state2,updated_at,updated_at2,on_angle,off_angle,on_angle2,off_angle2,invert1,invert2,timer_enabled,timer_days,timer_away"),
         getJson("/rest/v1/smartlight_schedule?select=at_time,action,target&order=at_time")
     ]);
     return { row: rows[0], events: sched.map(e => ({ t: String(e.at_time).slice(0, 5), a: e.action, g: e.target })) };
@@ -512,7 +526,7 @@ const rpc = rpcJson;
 const setLightRemote = (ch, state) => session ? rpc("light_set", { ...cred(), ch, new_state: state }) : rpc("light_set_net", { ch, new_state: state });
 const saveAnglesRemote = (ch, on, off) => rpc("light_save_angles", { ...cred(), ch, new_on: Math.round(on), new_off: Math.round(off) });
 const setInvertRemote = (ch, inv) => rpc("light_set_invert", { ...cred(), ch, inv });
-const saveTimerRemote = (enabled, days, events) => rpc("light_save_timer", { ...cred(), enabled, days, events });
+const saveTimerRemote = (enabled, days, events, away) => rpc("light_save_timer", { ...cred(), enabled, days, events, away });
 
 const cred = () => ({ p_person_id: session.id, p_pin: session.pin });
 const TZ = "Asia/Singapore";
@@ -726,7 +740,7 @@ const timerOn = el("timerOn"), daysBox = el("days"), eventsBox = el("events");
 const addBtn = el("addEvent"), saveTimerBtn = el("saveTimer"), timerNote = el("timerNote"), timerNext = el("timerNext");
 const TIMER_NOTE = "Singapore time. Runs on the server, even when this app is closed.";
 let serverTimer = null;                 // last saved timer from the database
-let model = { enabled: true, days: [1, 2, 3, 4, 5], events: [] };
+let model = { enabled: true, days: [1, 2, 3, 4, 5], events: [], away: [] };
 let timerDirty = false, savingTimer = false;
 
 const dayBtns = DAYS.map(d => {
@@ -742,7 +756,7 @@ const dayBtns = DAYS.map(d => {
     return b;
 });
 
-function cloneTimer(t) { return { enabled: t.enabled, days: [...t.days], events: t.events.map(e => ({ ...e })) }; }
+function cloneTimer(t) { return { enabled: t.enabled, days: [...t.days], events: t.events.map(e => ({ ...e })), away: (t.away || []).map(a => ({ ...a })) }; }
 function sameTimer(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 
 function eventRow(e, i) {
@@ -768,10 +782,41 @@ function eventRow(e, i) {
     row.append(t, a, g, del);
     return row;
 }
+const awayList = el("awayList"), addAwayBtn = el("addAway");
+function awayRow(a, i) {
+    const row = document.createElement("div");
+    row.className = "away-row";
+    const from = document.createElement("input");
+    from.type = "date"; from.value = a.from; from.setAttribute("aria-label", "Away from");
+    const to = document.createElement("input");
+    to.type = "date"; to.value = a.to; to.setAttribute("aria-label", "Back on");
+    from.addEventListener("change", () => { model.away[i].from = from.value; if (to.value && to.value < from.value) { to.value = from.value; model.away[i].to = from.value; } markTimerDirty(); });
+    to.addEventListener("change", () => { model.away[i].to = to.value; markTimerDirty(); });
+    const mid = document.createElement("span"); mid.textContent = "to";
+    const del = document.createElement("button");
+    del.type = "button"; del.className = "del"; del.textContent = "×";
+    del.setAttribute("aria-label", "Remove these away dates");
+    del.addEventListener("click", () => { model.away.splice(i, 1); renderTimer(); markTimerDirty(); });
+    row.append(from, mid, to, del);
+    return row;
+}
+function addDays(iso, n) { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function sgToday() { return new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()); }
+function fmtDay(iso) { return new Date(iso + "T00:00:00").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }); }
+const isAway = (t, iso) => (t.away || []).some(a => a.from <= iso && iso <= a.to);
+addAwayBtn.addEventListener("click", () => {
+    if (model.away.length >= 20) return;
+    const today = sgToday();
+    model.away.push({ from: today, to: addDays(today, 6) });
+    renderTimer(); markTimerDirty();
+    const inputs = awayList.querySelectorAll("input");
+    if (inputs.length) inputs[inputs.length - 2].focus();
+});
 function renderTimer() {
     timerOn.checked = model.enabled;
     DAYS.forEach((d, i) => dayBtns[i].setAttribute("aria-pressed", model.days.includes(d.n) ? "true" : "false"));
     eventsBox.replaceChildren(...model.events.map(eventRow));
+    awayList.replaceChildren(...model.away.map(awayRow));
     syncTimerSave();
 }
 function syncTimerSave() { saveTimerBtn.disabled = blocked || savingTimer || !timerDirty; }
@@ -794,10 +839,13 @@ addBtn.addEventListener("click", () => {
 });
 saveTimerBtn.addEventListener("click", async () => {
     if (model.events.some(e => !/^\d{2}:\d{2}$/.test(e.t))) { setTimerNote("Every row needs a time.", "err"); return; }
+    if (model.away.some(a => !a.from || !a.to || a.to < a.from)) { setTimerNote("Check the away dates: each needs a start and an end that is not before it.", "err"); return; }
+    const today = sgToday();
+    model.away = model.away.filter(a => a.to >= today).sort((x, y) => x.from < y.from ? -1 : x.from > y.from ? 1 : 0);   // drop dates already past
     model.events.sort((x, y) => toMin(x.t) - toMin(y.t));
     savingTimer = true; syncTimerSave(); setTimerNote("Saving");
     try {
-        await saveTimerRemote(model.enabled, model.days, model.events);
+        await saveTimerRemote(model.enabled, model.days, model.events, model.away);
         serverTimer = cloneTimer(model);
         timerDirty = false;
         renderTimer();
@@ -817,10 +865,12 @@ function sgClock() {
 function nextEvent(t) {
     if (!t || !t.enabled || !t.events.length || !t.days.length) return null;
     const now = sgClock();
-    const evs = [...t.events].sort((a, b) => toMin(a.t) - toMin(b.t));
+    const all = [...t.events].sort((a, b) => toMin(a.t) - toMin(b.t));
+    const today = sgToday();
     for (let o = 0; o <= 7; o++) {
         const dow = ((now.dow - 1 + o) % 7) + 1;
         if (!t.days.includes(dow)) continue;
+        const evs = isAway(t, addDays(today, o)) ? all.filter(e => e.a === "OFF") : all;
         for (const e of evs) if (o > 0 || toMin(e.t) > now.min) return { o, dow, e };
     }
     return null;
@@ -829,6 +879,8 @@ function updateNext() {
     timerNext.replaceChildren();
     if (!serverTimer) { timerNext.textContent = "Loading…"; return; }
     if (!serverTimer.enabled) { timerNext.textContent = "Timer is off."; return; }
+    const away = (serverTimer.away || []).find(a => a.from <= sgToday() && sgToday() <= a.to);
+    if (away) { timerNext.textContent = "Away until " + fmtDay(away.to) + ". Lights won't turn on."; return; }
     const n = nextEvent(serverTimer);
     if (!n) { timerNext.textContent = "No upcoming times."; return; }
     const when = n.o === 0 ? "today" : n.o === 1 ? "tomorrow" : DAYS[n.dow - 1].l;
@@ -842,10 +894,11 @@ function applyTimer(row, events) {
     serverTimer = {
         enabled: row.timer_enabled,
         days: (row.timer_days || []).map(Number).sort(),
-        events: events.map(e => ({ t: e.t, a: e.a, g: e.g })).sort((x, y) => toMin(x.t) - toMin(y.t))
+        events: events.map(e => ({ t: e.t, a: e.a, g: e.g })).sort((x, y) => toMin(x.t) - toMin(y.t)),
+        away: (Array.isArray(row.timer_away) ? row.timer_away : []).map(a => ({ from: a.from, to: a.to }))
     };
     // Never rebuild the rows while the user is editing in them (it drops focus and closes the time picker).
-    const editing = eventsBox.contains(document.activeElement) || daysBox.contains(document.activeElement);
+    const editing = eventsBox.contains(document.activeElement) || daysBox.contains(document.activeElement) || awayList.contains(document.activeElement);
     if (!timerDirty && !savingTimer && !editing && !sameTimer(model, serverTimer)) { model = cloneTimer(serverTimer); renderTimer(); }
     updateNext();
 }
