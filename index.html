@@ -65,8 +65,8 @@ header {
 .conn[data-ok="false"] .conn-dot { background: var(--err); }
 
 main {
-    display: flex; flex-direction: column; align-items: center; gap: 22px;
-    position: relative; padding: 4px 0 24px; max-width: 560px; margin: 0 auto;
+    display: flex; flex-direction: column; align-items: stretch; gap: 16px;
+    position: relative; padding: 4px 0 calc(100px + env(safe-area-inset-bottom, 0px)); max-width: 560px; margin: 0 auto;
 }
 
 /* ---------- Room view ---------- */
@@ -102,8 +102,9 @@ main {
 .room[data-left="ON"] #tagLeft .dot, .room[data-right="ON"] #tagRight .dot { fill: var(--amber); }
 
 /* ---------- Switch plates ---------- */
-.switches { display: flex; justify-content: center; gap: 18px; width: 100%; }
-.unit { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.switches { display: flex; justify-content: center; gap: 14px; width: 100%; }
+.unit { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 10px 14px; border: 1px solid var(--plate-edge); border-radius: 20px; background: color-mix(in srgb, var(--plate) 55%, transparent); transition: border-color 300ms ease, box-shadow 300ms ease; }
+.unit[data-state="ON"] { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber) inset, 0 12px 30px -18px var(--amber); }
 .unit-name { font-size: 14px; font-weight: 500; color: var(--muted); text-align: center; }
 .unit-state { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
 .unit-changed { margin: 0; font-size: 12.5px; color: var(--muted); text-align: center; min-height: 17px; }
@@ -138,35 +139,43 @@ main {
 }
 .msg button { margin-top: 10px; }
 
+/* ---------- Layout ---------- */
+.panel { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+.panel[hidden] { display: none; }
+.foot-note { margin: 0; text-align: center; font-size: 13px; color: var(--muted); }
+.sub { margin: 18px 0 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
 /* ---------- Cards ---------- */
-.card { width: 100%; border: 1px solid var(--plate-edge); border-radius: 16px; background: var(--plate); padding: 16px 18px 18px; }
-.timer-head { display: flex; align-items: center; justify-content: space-between; }
-.timer-head h2 { font-size: 17px; font-weight: 600; margin: 0; }
-.timer-next { margin: 6px 0 14px; font-size: 15px; color: var(--muted); }
+.card { width: 100%; border: 1px solid var(--plate-edge); border-radius: 18px; background: var(--plate); padding: 18px; box-shadow: 0 10px 24px -20px rgba(20, 30, 40, 0.5); }
+.card h2 { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.card-head { display: flex; align-items: center; justify-content: space-between; }
+.timer-next { margin: 6px 0 0; font-size: 15px; color: var(--muted); }
 .timer-next strong { color: var(--ink); font-weight: 600; }
 
 .toggle { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
 .toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.toggle .track { width: 46px; height: 28px; border-radius: 14px; background: var(--plate-edge); position: relative; transition: background 200ms ease; }
-.toggle .thumb { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: transform 200ms ease; }
+.toggle .track { width: 50px; height: 30px; border-radius: 15px; background: var(--plate-edge); position: relative; transition: background 200ms ease; }
+.toggle .thumb { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: transform 200ms ease; }
 .toggle input:checked + .track { background: var(--amber); }
-.toggle input:checked + .track .thumb { transform: translateX(18px); }
+.toggle input:checked + .track .thumb { transform: translateX(20px); }
 .toggle input:focus-visible + .track { outline: 3px solid var(--amber); outline-offset: 2px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-.days { display: flex; gap: 6px; margin-bottom: 14px; }
+.days { display: flex; gap: 6px; }
 .day {
-    flex: 1 1 0; height: 36px; border-radius: 10px; border: 1px solid var(--plate-edge);
+    flex: 1 1 0; height: 40px; border-radius: 12px; border: 1px solid var(--plate-edge);
     background: transparent; color: var(--muted); font: 600 14px var(--font); cursor: pointer;
 }
 .day[aria-pressed="true"] { background: var(--ink); color: var(--wall); border-color: var(--ink); }
 .day:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 
-.events { display: flex; flex-direction: column; gap: 8px; }
-.event { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 0.8fr) minmax(0, 1fr) 36px; gap: 6px; align-items: center; }
+.events { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.events:empty::before { content: "No times yet. Tap Add time."; font-size: 14px; color: var(--muted); padding: 6px 0; }
+.event { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.8fr) minmax(0, 1.15fr) 36px; gap: 6px; align-items: center; }
+.event input[type="time"]::-webkit-calendar-picker-indicator { display: none; }
 .event input, .event select {
     font: 500 14px var(--font); color: var(--ink); background: var(--wall);
-    border: 1px solid var(--plate-edge); border-radius: 10px; height: 40px; padding: 0 6px; width: 100%; min-width: 0;
+    border: 1px solid var(--plate-edge); border-radius: 10px; height: 42px; padding: 0 8px; width: 100%; min-width: 0;
 }
 .event input:focus-visible, .event select:focus-visible { outline: 3px solid var(--amber); outline-offset: 1px; }
 .del {
@@ -174,16 +183,49 @@ main {
     color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer;
 }
 .del:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
-.timer-actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; }
-.timer-note { margin: 12px 0 0; font-size: 13px; color: var(--muted); }
-.timer-note[data-kind="err"] { color: var(--err); }
 
-/* ---------- Angle settings ---------- */
-.angles { width: 100%; border: 1px solid var(--plate-edge); border-radius: 16px; background: var(--plate); }
-.angles summary { list-style: none; cursor: pointer; padding: 14px 18px; font-weight: 500; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+.ghost.wide { width: 100%; }
+.ghost { font: inherit; font-size: 14px; font-weight: 500; padding: 10px 14px; border-radius: 12px; border: 1px dashed var(--plate-edge); background: transparent; color: var(--ink); cursor: pointer; }
+.ghost:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+.away-help { margin: 4px 0 12px; font-size: 13px; color: var(--muted); }
+.away-list { display: flex; flex-direction: column; gap: 8px; }
+.away-list:not(:empty) { margin-bottom: 12px; }
+.away-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 36px; gap: 6px; align-items: center; }
+.away-row span { font-size: 13px; color: var(--muted); }
+.away-row input { font: inherit; font-size: 15px; height: 42px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--plate-edge); background: var(--wall); color: var(--ink); min-width: 0; width: 100%; }
+.away-row input:focus-visible { outline: 3px solid var(--amber); outline-offset: 1px; }
+
+/* Save bar stays in view above the tab bar */
+.savebar {
+    position: sticky; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 14px; border: 1px solid var(--plate-edge); border-radius: 16px;
+    background: var(--plate); box-shadow: 0 10px 28px -12px rgba(10, 15, 25, 0.45);
+}
+.timer-note { margin: 0; font-size: 13px; color: var(--muted); }
+.timer-note[data-kind="err"] { color: var(--err); }
+.save {
+    font: inherit; font-weight: 600; font-size: 15px; padding: 11px 20px; border-radius: 12px; border: none;
+    background: var(--ink); color: var(--wall); cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.save:disabled { opacity: 0.45; cursor: default; }
+.save:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+/* ---------- Settings ---------- */
+.account { display: flex; align-items: center; gap: 12px; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--amber); color: #2a1b00; font-weight: 600; display: grid; place-items: center; flex-shrink: 0; }
+.who { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.who strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who span { font-size: 13px; color: var(--muted); }
+.account .ghost { border-style: solid; }
+
+.angles { width: 100%; border: 1px solid var(--plate-edge); border-radius: 18px; background: var(--plate); box-shadow: 0 10px 24px -20px rgba(20, 30, 40, 0.5); }
+.angles summary { list-style: none; cursor: pointer; padding: 16px 18px; font-weight: 600; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+.angles summary small { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--muted); }
 .angles summary::-webkit-details-marker { display: none; }
-.angles summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform 200ms ease; margin-right: 4px; }
-.angles[open] summary::after { transform: rotate(-135deg); }
+.angles summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform 200ms ease; margin: 0 4px 3px 6px; }
+.angles[open] summary::after { transform: rotate(-135deg); margin-bottom: -3px; }
 .angles summary:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; border-radius: 16px; }
 .angles-body { padding: 0 18px 18px; }
 .angles-group + .angles-group { border-top: 1px solid var(--plate-edge); margin-top: 4px; }
@@ -195,28 +237,47 @@ input[type="range"] { width: 100%; accent-color: var(--amber); height: 28px; mar
 .swap { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); margin: 2px 0 14px; cursor: pointer; }
 .swap input { width: 18px; height: 18px; accent-color: var(--amber); }
 .angles-actions { display: flex; align-items: center; gap: 12px; }
-.save {
-    font: inherit; font-weight: 600; font-size: 15px; padding: 11px 20px; border-radius: 12px; border: none;
-    background: var(--ink); color: var(--wall); cursor: pointer; white-space: nowrap; flex-shrink: 0;
-}
-.save:disabled { opacity: 0.45; cursor: default; }
-.save:focus-visible, .ghost:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 .angles-note { font-size: 14px; color: var(--muted); }
 .angles-note[data-kind="err"] { color: var(--err); }
 
-footer { text-align: center; font-size: 13px; color: var(--muted); padding: 0 0 22px; position: relative; }
+.net-card p { margin: 4px 0 12px; font-size: 14px; color: var(--muted); }
+.net-card .net-add { display: flex; gap: 8px; margin-bottom: 12px; }
+.net-card input { flex: 1; min-width: 0; font: inherit; font-size: 15px; height: 42px; padding: 0 11px; border-radius: 10px; border: 1px solid var(--plate-edge); background: var(--wall); color: var(--ink); }
+.net-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.net-card li { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; padding-top: 8px; border-top: 1px solid var(--plate-edge); }
+.net-card li span small { display: block; color: var(--muted); font-size: 12px; }
+.net-card button { font: inherit; font-size: 14px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--plate-edge); background: transparent; color: var(--ink); cursor: pointer; }
+.net-card[hidden] { display: none; }
+.net-note { min-height: 18px; font-size: 13px; color: var(--err); }
+.net-note[data-kind="ok"] { color: var(--ok); }
 
-@media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; } }
+/* ---------- Tab bar ---------- */
+.tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    display: flex; justify-content: center; gap: 4px;
+    padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--plate) 92%, transparent); backdrop-filter: blur(10px);
+    border-top: 1px solid var(--plate-edge);
+}
+.tab {
+    flex: 1 1 0; max-width: 180px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 8px 4px; border: 0; border-radius: 12px; background: transparent; color: var(--muted);
+    font: 500 12px var(--font); cursor: pointer;
+}
+.tab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tab[aria-current="page"] { color: var(--ink); font-weight: 600; }
+.tab[aria-current="page"] svg { stroke: var(--amber); }
+.tab:focus-visible { outline: 3px solid var(--amber); outline-offset: -2px; }
+
+/* Signed out: only the lights, read-only. */
+body[data-auth="out"] #tabbar { display: none; }
+body[data-auth="out"] main { padding-bottom: 28px; }
+body[data-auth="in"] #auth, body[data-auth="in"] #signInBtn, body[data-auth="out"]:not([data-login="open"]) #auth { display: none; }
+body[data-login="open"] main, body[data-login="open"] #tabbar, body[data-login="open"] #signInBtn { display: none; }
+.head-right { display: flex; align-items: center; gap: 12px; }
+#signInBtn { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 10px; border: 0; background: var(--ink); color: var(--wall); cursor: pointer; }
 
 /* ---------- Sign in ---------- */
-/* Signed out: lights are visible read-only; controls need a sign-in. */
-body[data-auth="out"] #userChip, body[data-auth="out"] .card.timer, body[data-auth="out"] .angles { display: none; }
-body[data-auth="in"] #auth, body[data-auth="in"] #signInBtn, body[data-auth="out"]:not([data-login="open"]) #auth { display: none; }
-body[data-login="open"] main, body[data-login="open"] footer, body[data-login="open"] #signInBtn { display: none; }
-.head-right { display: flex; align-items: center; gap: 12px; }
-#signInBtn { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--plate-edge); background: var(--plate); color: var(--ink); cursor: pointer; }
-.user-chip { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
-.user-chip button { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--plate-edge); background: var(--plate); color: var(--ink); cursor: pointer; }
 .auth { max-width: 360px; margin: 18px auto 40px; padding: 22px 20px; background: var(--plate); border: 1px solid var(--plate-edge); border-radius: 18px; position: relative; }
 .auth h2 { margin: 0 0 4px; font-size: 19px; font-weight: 600; }
 .auth .auth-sub { margin: 0 0 16px; font-size: 14px; color: var(--muted); }
@@ -232,38 +293,18 @@ body[data-login="open"] main, body[data-login="open"] footer, body[data-login="o
 .auth .link { font: inherit; padding: 0; border: 0; background: none; color: var(--ink); text-decoration: underline; cursor: pointer; }
 .auth [hidden] { display: none !important; }
 .auth .code-input { letter-spacing: 6px; text-align: center; font-size: 22px; }
-.away { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--plate-edge); }
-.away h3 { margin: 0 0 2px; font-size: 15px; font-weight: 600; }
-.away-help { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
-.away-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-.away-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 36px; gap: 6px; align-items: center; }
-.away-row span { font-size: 13px; color: var(--muted); }
-.away-row input { font: inherit; font-size: 15px; padding: 8px 8px; border-radius: 10px; border: 1px solid var(--plate-edge); background: var(--wall); color: var(--ink); min-width: 0; width: 100%; }
-.away-row input:focus-visible { outline: 3px solid var(--amber); outline-offset: 1px; }
-.net-card h2 { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
-.net-card p { margin: 0 0 10px; font-size: 14px; color: var(--muted); }
-.net-card .net-add { display: flex; gap: 8px; margin-bottom: 12px; }
-.net-card input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--plate-edge); background: var(--wall); color: var(--ink); }
-.net-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.net-card li { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; }
-.net-card li span small { display: block; color: var(--muted); font-size: 12px; }
-.net-card button { font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--plate-edge); background: var(--plate); color: var(--ink); cursor: pointer; }
-.net-card[hidden] { display: none; }
-.net-note { min-height: 18px; font-size: 13px; color: var(--err); }
-.net-note[data-kind="ok"] { color: var(--ok); }
-body[data-auth="out"] #netCard { display: none; }
+@media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; } }
 </style>
 </head>
 <body data-state="unknown">
 
-<header>
+<header class="top">
     <div class="brand">
         <h1>Makerspace</h1>
         <p>Smart lights</p>
     </div>
     <div class="head-right">
         <div class="conn" id="conn"><span class="conn-dot"></span><span id="connText">Connecting</span></div>
-        <div class="user-chip" id="userChip"><span id="userName"></span><button type="button" id="signOut">Sign out</button></div>
         <button type="button" id="signInBtn">Sign in</button>
     </div>
 </header>
@@ -309,7 +350,9 @@ body[data-auth="out"] #netCard { display: none; }
 </section>
 
 <main>
-    <div class="room-card">
+    <!-- ============ Lights ============ -->
+    <section class="panel" id="panelLights" aria-label="Lights">
+        <div class="room-card">
 <svg class="room" id="room" data-left="unknown" data-right="unknown" viewBox="0 0 400 240" role="group" aria-labelledby="roomTitle">
     <title id="roomTitle">Makerspace, simple view</title>
     <defs>
@@ -389,58 +432,75 @@ body[data-auth="out"] #netCard { display: none; }
         <path d="M0 100H400V200H0Z"/>
     </g>
 </svg>
+        </div>
+        <p class="room-hint">Tap the ceiling or the wall to switch the lights.</p>
 
-    </div>
-    <p class="room-hint">Tap the ceiling or the wall to switch the lights.</p>
+        <div class="switches">
+            <div class="unit" id="unit1" data-state="unknown">
+                <div class="unit-name">Square lights</div>
+                <button class="plate" id="plate1" aria-pressed="false" aria-label="Square lights" disabled>
+                    <span class="screw" aria-hidden="true"></span>
+                    <span class="rocker-well" aria-hidden="true"><span class="rocker"><span class="led"></span></span></span>
+                    <span class="screw" aria-hidden="true"></span>
+                </button>
+                <h2 class="unit-state" id="state1">Checking</h2>
+                <p class="unit-changed" id="changed1">&nbsp;</p>
+            </div>
+            <div class="unit" id="unit2" data-state="unknown">
+                <div class="unit-name">Wall spotlights</div>
+                <button class="plate" id="plate2" aria-pressed="false" aria-label="Wall spotlights" disabled>
+                    <span class="screw" aria-hidden="true"></span>
+                    <span class="rocker-well" aria-hidden="true"><span class="rocker"><span class="led"></span></span></span>
+                    <span class="screw" aria-hidden="true"></span>
+                </button>
+                <h2 class="unit-state" id="state2">Checking</h2>
+                <p class="unit-changed" id="changed2">&nbsp;</p>
+            </div>
+        </div>
 
-    <div class="switches">
-        <div class="unit" id="unit1" data-state="unknown">
-            <div class="unit-name">Square lights</div>
-            <button class="plate" id="plate1" aria-pressed="false" aria-label="Square lights" disabled>
-                <span class="screw" aria-hidden="true"></span>
-                <span class="rocker-well" aria-hidden="true"><span class="rocker"><span class="led"></span></span></span>
-                <span class="screw" aria-hidden="true"></span>
-            </button>
-            <h2 class="unit-state" id="state1">Checking</h2>
-            <p class="unit-changed" id="changed1">&nbsp;</p>
-        </div>
-        <div class="unit" id="unit2" data-state="unknown">
-            <div class="unit-name">Wall spotlights</div>
-            <button class="plate" id="plate2" aria-pressed="false" aria-label="Wall spotlights" disabled>
-                <span class="screw" aria-hidden="true"></span>
-                <span class="rocker-well" aria-hidden="true"><span class="rocker"><span class="led"></span></span></span>
-                <span class="screw" aria-hidden="true"></span>
-            </button>
-            <h2 class="unit-state" id="state2">Checking</h2>
-            <p class="unit-changed" id="changed2">&nbsp;</p>
-        </div>
-    </div>
-
-    <div class="status" aria-live="polite"><div class="msg" id="msg"></div></div>
-
-    <section class="card timer" aria-labelledby="timerTitle">
-        <div class="timer-head">
-            <h2 id="timerTitle">Timer</h2>
-            <label class="toggle"><input type="checkbox" id="timerOn"><span class="track"><span class="thumb"></span></span><span class="sr">Timer on</span></label>
-        </div>
-        <p class="timer-next" id="timerNext" aria-live="polite">Loading…</p>
-        <div class="days" id="days" role="group" aria-label="Days the timer runs"></div>
-        <div class="events" id="events"></div>
-        <div class="away" id="awayBox">
-            <h3>Away / holiday</h3>
-            <p class="away-help">Nobody in? The lights won't turn on during these dates. Off times still run, so nothing is left on.</p>
-            <div class="away-list" id="awayList"></div>
-            <button type="button" class="ghost" id="addAway">Add away dates</button>
-        </div>
-        <div class="timer-actions">
-            <button type="button" class="ghost" id="addEvent">Add time</button>
-            <button type="button" class="save" id="saveTimer" disabled>Save timer</button>
-        </div>
-        <p class="timer-note" id="timerNote">Singapore time. Runs on the server, even when this app is closed.</p>
+        <div class="status" aria-live="polite"><div class="msg" id="msg"></div></div>
+        <p class="foot-note">Lights follow within a few seconds.</p>
     </section>
 
-    <details class="angles" id="angles">
-        <summary>Switch angles</summary>
+    <!-- ============ Timer ============ -->
+    <section class="panel" id="panelTimer" aria-label="Timer" hidden>
+        <div class="card timer" aria-labelledby="timerTitle">
+            <div class="card-head">
+                <h2 id="timerTitle">Timer</h2>
+                <label class="toggle"><input type="checkbox" id="timerOn"><span class="track"><span class="thumb"></span></span><span class="sr">Timer on</span></label>
+            </div>
+            <p class="timer-next" id="timerNext" aria-live="polite">Loading…</p>
+
+            <h3 class="sub">Days</h3>
+            <div class="days" id="days" role="group" aria-label="Days the timer runs"></div>
+
+            <h3 class="sub">Times</h3>
+            <div class="events" id="events"></div>
+            <button type="button" class="ghost wide" id="addEvent">+ Add time</button>
+        </div>
+
+        <div class="card away" id="awayBox">
+            <h2>Away / holiday</h2>
+            <p class="away-help">Nobody in? The lights won't turn on during these dates. Off times still run, so nothing is left on.</p>
+            <div class="away-list" id="awayList"></div>
+            <button type="button" class="ghost wide" id="addAway">+ Add away dates</button>
+        </div>
+
+        <div class="savebar">
+            <p class="timer-note" id="timerNote">Singapore time. Runs on the server, even when this app is closed.</p>
+            <button type="button" class="save" id="saveTimer" disabled>Save timer</button>
+        </div>
+    </section>
+
+    <!-- ============ Settings ============ -->
+    <section class="panel" id="panelSettings" aria-label="Settings" hidden>
+        <div class="card account" id="userChip">
+            <div class="avatar" id="avatar" aria-hidden="true"></div>
+            <div class="who"><strong id="userName"></strong><span>Signed in</span></div>
+            <button type="button" class="ghost" id="signOut">Sign out</button>
+        </div>
+        <details class="angles" id="angles">
+        <summary><span>Switch angles</span><small>Advanced</small></summary>
         <div class="angles-body">
             <div class="angles-group">
                 <h3>Square lights</h3>
@@ -472,9 +532,7 @@ body[data-auth="out"] #netCard { display: none; }
             </div>
         </div>
     </details>
-</main>
-
-<section class="card net-card" id="netCard" hidden aria-labelledby="netTitle" style="max-width:560px;margin:0 auto 24px">
+        <section class="card net-card" id="netCard" hidden aria-labelledby="netTitle">
     <h2 id="netTitle">Trusted networks</h2>
     <p id="netYou">Checking this network…</p>
     <div class="net-add">
@@ -484,8 +542,23 @@ body[data-auth="out"] #netCard { display: none; }
     <div class="net-note" id="netNote" aria-live="polite"></div>
     <ul id="netList"></ul>
 </section>
+    </section>
+</main>
 
-<footer>Lights follow within a few seconds.</footer>
+<nav class="tabbar" id="tabbar" aria-label="Sections">
+    <button type="button" class="tab" data-tab="lights" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg>
+        <span>Lights</span>
+    </button>
+    <button type="button" class="tab" data-tab="timer">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg>
+        <span>Timer</span>
+    </button>
+    <button type="button" class="tab" data-tab="settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        <span>Settings</span>
+    </button>
+</nav>
 
 <script>
 // ---- Settings ----
@@ -982,7 +1055,8 @@ function setSession(next) {
     try { next ? localStorage.setItem(SESSION_KEY, JSON.stringify(next)) : localStorage.removeItem(SESSION_KEY); } catch (_) {}
     document.body.dataset.auth = next ? "in" : "out";
     delete document.body.dataset.login;
-    userName.textContent = next ? next.name : "";
+    paintUser(next);
+    if (!next) showTab("lights");
     clearMessage(); refresh();
     if (typeof setTrusted === "function") { setTrusted(trusted); loadNetworks(); }
 }
@@ -1075,6 +1149,19 @@ el("manualVerify").addEventListener("click", async () => {
 el("signOut").addEventListener("click", () => signOut());
 
 
+// ---------- tabs ----------
+const tabBtns = [...document.querySelectorAll(".tab")];
+const PANELS = { lights: el("panelLights"), timer: el("panelTimer"), settings: el("panelSettings") };
+function showTab(name) {
+    if (!PANELS[name]) name = "lights";
+    for (const k in PANELS) PANELS[k].hidden = k !== name;
+    tabBtns.forEach(b => b.dataset.tab === name ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+    try { localStorage.setItem("smartlight.tab", name); } catch (_) {}
+    window.scrollTo(0, 0);
+}
+tabBtns.forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+function paintUser(u) { userName.textContent = u ? u.name : ""; el("avatar").textContent = u ? (u.name.trim().charAt(0) || "?").toUpperCase() : ""; }
+
 // ---------- trusted networks ----------
 const roomHint = document.querySelector(".room-hint");
 const HINT_DEFAULT = roomHint ? roomHint.textContent : "";
@@ -1132,7 +1219,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) chec
 ready = true;
 document.body.dataset.auth = session ? "in" : "out";
 if (session) {
-    userName.textContent = session.name;
+    paintUser(session);
     // Confirm the saved sign-in is still valid.
     rpcJson("login_person", { p_person_id: session.id, p_pin: session.pin })
         .then(r => { if (r && r.success === false) signOut("Please sign in again."); })
@@ -1140,6 +1227,9 @@ if (session) {
 }
 refresh();
 startPolling();
+let startTab = "lights";
+try { startTab = localStorage.getItem("smartlight.tab") || "lights"; } catch (_) {}
+showTab(session ? startTab : "lights");
 setTrusted(false);
 checkNetwork();
 if (session) loadNetworks();
